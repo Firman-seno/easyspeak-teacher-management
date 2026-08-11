@@ -44,7 +44,25 @@ const schema = z.object({
   notes: z.string().trim().max(1000).optional(),
 });
 
-const empty = {
+type FormValues = {
+  name: string;
+  student_id: string;
+  gender: string;
+  date_of_birth: string;
+  phone: string;
+  email: string;
+  address: string;
+  program: string;
+  current_level: string;
+  target_level: string;
+  enrollment_date: string;
+  teacher: string;
+  status: string;
+  photo: string;
+  notes: string;
+};
+
+const empty: FormValues = {
   name: "",
   student_id: "",
   gender: "Female",
@@ -62,7 +80,6 @@ const empty = {
   notes: "",
 };
 
-type FormValues = typeof empty;
 
 export function StudentFormDialog({
   open,
