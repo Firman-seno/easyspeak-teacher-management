@@ -23,11 +23,14 @@ export const api = {
   async student(id: string): Promise<Student> {
     return unwrap(await supabase.from("students").select("*").eq("id", id).single());
   },
-  async createStudent(values: TablesInsert<"students">) {
-    const student = unwrap(await supabase.from("students").insert(values).select().single());
-    if (student) await supabase.from("progress").insert({ student_id: student.id });
+  async createStudent(values: TablesInsert<"students">): Promise<Student> {
+    const student = unwrap(
+      await supabase.from("students").insert(values).select().single(),
+    ) as Student;
+    await supabase.from("progress").insert({ student_id: student.id });
     return student;
   },
+
 
   async updateStudent(id: string, values: TablesUpdate<"students">) {
     return unwrap(await supabase.from("students").update(values).eq("id", id).select().single());
