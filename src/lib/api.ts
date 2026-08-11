@@ -25,9 +25,10 @@ export const api = {
   },
   async createStudent(values: TablesInsert<"students">) {
     const student = unwrap(await supabase.from("students").insert(values).select().single());
-    await supabase.from("progress").insert({ student_id: student.id });
+    if (student) await supabase.from("progress").insert({ student_id: student.id });
     return student;
   },
+
   async updateStudent(id: string, values: TablesUpdate<"students">) {
     return unwrap(await supabase.from("students").update(values).eq("id", id).select().single());
   },
