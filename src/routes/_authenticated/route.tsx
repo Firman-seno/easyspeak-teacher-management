@@ -1,10 +1,14 @@
 import { createFileRoute, Outlet, redirect, useRouter } from "@tanstack/react-router";
+import type { User } from "@supabase/supabase-js";
 import { LogOut } from "lucide-react";
+import { useEffect, useState } from "react";
 
 import { AppSidebar } from "@/components/app-sidebar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { supabase } from "@/integrations/supabase/client";
+import { initials } from "@/lib/domain";
 
 export const Route = createFileRoute("/_authenticated")({
   ssr: false,
@@ -19,6 +23,18 @@ export const Route = createFileRoute("/_authenticated")({
 function AuthenticatedLayout() {
   const router = useRouter();
   const { user } = Route.useRouteContext();
+  const [currentUser, setCurrentUser] = useState<User | null>(user);
+
+  useEffect(() => {
+    const { data } = supabase.auth.onAuthStateChange((_event, session) => {
+      setCurrentUser(session?.user ?? null);
+    });
+    return () => data.subscription.unsubscribe();
+  }, []);
+
+  const displayName =
+    (currentUser?.user_metadata?.["full_name"] as string | undefined) ?? currentUser?.email ?? "";
+  const avatarUrl = (currentUser?.user_metadata?.["avatar_url"] as string | undefined) ?? null;
 
   const signOut = async () => {
     await supabase.auth.signOut();
@@ -42,8 +58,12 @@ function AuthenticatedLayout() {
             </div>
             <div className="flex shrink-0 items-center gap-2">
               <span className="hidden max-w-[180px] truncate text-xs text-muted-foreground md:inline">
-                {user.email}
+                {currentUser?.email}
               </span>
+              <Avatar className="size-8" title={displayName}>
+                {avatarUrl && <AvatarImage src={avatarUrl} alt={displayName} />}
+                <AvatarFallback className="text-xs">{initials(displayName || "T")}</AvatarFallback>
+              </Avatar>
               <Button variant="outline" size="sm" onClick={signOut}>
                 <LogOut className="size-4" />
                 <span className="hidden sm:inline">Sign out</span>

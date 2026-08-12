@@ -1,8 +1,11 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { ArrowLeft, Pencil } from "lucide-react";
+import { ArrowLeft, Pencil, Plus } from "lucide-react";
 import { useMemo, useState } from "react";
 
+import { AssignmentFormDialog } from "@/components/assignment-form";
 import { EmptyState, ProgressBar, StatusBadge, statusTone } from "@/components/kit";
+import { LessonFormDialog } from "@/components/lesson-form";
+import { ProjectFormDialog } from "@/components/project-form";
 import { StudentFormDialog } from "@/components/student-form";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -17,6 +20,7 @@ import {
 } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
+  useAssignments,
   useAttendance,
   useLessons,
   useProgress,
@@ -29,6 +33,8 @@ import {
   MONTHS,
   SKILLS,
   attendanceLabel,
+  effectiveAssignmentStatus,
+  effectiveProjectStatus,
   formatDate,
   initials,
   projectStats,
@@ -42,10 +48,13 @@ export const Route = createFileRoute("/_authenticated/students/$id")({
       {
         name: "description",
         content:
-          "Detailed student profile: attendance history, lessons, projects, skill progress and reports.",
+          "Detailed student profile: attendance history, lessons, assignments, projects, skill progress and reports.",
       },
       { property: "og:title", content: "Student profile — EasySpeak Teacher Management" },
-      { property: "og:description", content: "Attendance, lessons, projects and skill progress." },
+      {
+        property: "og:description",
+        content: "Attendance, lessons, assignments, projects and skill progress.",
+      },
     ],
   }),
   component: StudentDetail,
@@ -56,31 +65,43 @@ function StudentDetail() {
   const students = useStudents();
   const attendance = useAttendance();
   const lessons = useLessons();
+  const assignments = useAssignments();
   const projects = useProjects();
   const progress = useProgress();
   const history = useProgressHistory(id);
   const reports = useReports();
   const [editOpen, setEditOpen] = useState(false);
+  const [lessonFormOpen, setLessonFormOpen] = useState(false);
+  const [assignmentFormOpen, setAssignmentFormOpen] = useState(false);
+  const [projectFormOpen, setProjectFormOpen] = useState(false);
 
   const student = (students.data ?? []).find((s) => s.id === id);
 
   const data = useMemo(() => {
     const records = (attendance.data ?? []).filter((a) => a.student_id === id);
     const proj = (projects.data ?? []).filter((p) => p.student_id === id);
+    const assign = (assignments.data ?? []).filter((a) => a.student_id === id);
     const prog = (progress.data ?? []).find((p) => p.student_id === id);
-    const covered = (lessons.data ?? []).filter(
-      (l) => !student || l.program === student.program || l.level === student.current_level,
-    );
+    const covered = (lessons.data ?? []).filter((l) => l.student_id === id);
     return {
       att: summarizeAttendance(records),
       records,
       proj,
+      assign,
       stats: projectStats(proj),
       prog,
       covered,
       reports: (reports.data ?? []).filter((r) => r.student_id === id),
     };
-  }, [attendance.data, projects.data, progress.data, lessons.data, reports.data, id, student]);
+  }, [
+    attendance.data,
+    projects.data,
+    assignments.data,
+    progress.data,
+    lessons.data,
+    reports.data,
+    id,
+  ]);
 
   if (students.isLoading) return <p className="text-sm text-muted-foreground">Loading student…</p>;
   if (!student)
@@ -135,7 +156,8 @@ function StudentDetail() {
         <TabsList className="flex w-full flex-wrap justify-start">
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="attendance">Attendance</TabsTrigger>
-          <TabsTrigger value="lessons">Lessons</TabsTrigger>
+          <TabsTrigger value="lessons">Lessons / Materials</TabsTrigger>
+          <TabsTrigger value="assignments">Assignments</TabsTrigger>
           <TabsTrigger value="projects">Projects</TabsTrigger>
           <TabsTrigger value="progress">Progress</TabsTrigger>
           <TabsTrigger value="reports">Reports</TabsTrigger>
@@ -179,6 +201,14 @@ function StudentDetail() {
               <div className="flex justify-between">
                 <span>Lessons covered</span>
                 <span className="font-semibold">{data.covered.length}</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Assignments</span>
+                <span className="font-semibold">{data.assign.length}</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Projects</span>
+                <span className="font-semibold">{data.stats.total}</span>
               </div>
               <div className="flex justify-between">
                 <span>Completed projects</span>
@@ -237,10 +267,27 @@ function StudentDetail() {
           </Card>
         </TabsContent>
 
-        <TabsContent value="lessons" className="mt-4">
+        <TabsContent value="lessons" className="mt-4 space-y-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <p className="text-sm text-muted-foreground">
+              {data.covered.length} lesson{data.covered.length === 1 ? "" : "s"} recorded for this
+              student.
+            </p>
+            <Button onClick={() => setLessonFormOpen(true)}>
+              <Plus className="size-4" /> Add Material for {student.name}
+            </Button>
+          </div>
           <Card className="shadow-soft overflow-hidden">
             {data.covered.length === 0 ? (
-              <EmptyState title="No lessons recorded yet." />
+              <EmptyState
+                title="No lessons recorded yet."
+                description="Create the first material for this student."
+                action={
+                  <Button onClick={() => setLessonFormOpen(true)}>
+                    <Plus className="size-4" /> Add Material
+                  </Button>
+                }
+              />
             ) : (
               <div className="overflow-x-auto">
                 <Table>
@@ -248,19 +295,27 @@ function StudentDetail() {
                     <TableRow>
                       <TableHead>Date</TableHead>
                       <TableHead>Title</TableHead>
+                      <TableHead>Subtitle</TableHead>
                       <TableHead>Level</TableHead>
                       <TableHead>Topic</TableHead>
                       <TableHead>Grammar</TableHead>
+                      <TableHead>Status</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {data.covered.map((l) => (
                       <TableRow key={l.id}>
-                        <TableCell>{formatDate(l.date)}</TableCell>
+                        <TableCell className="whitespace-nowrap">{formatDate(l.date)}</TableCell>
                         <TableCell className="font-medium">{l.title}</TableCell>
+                        <TableCell className="max-w-[200px] truncate">
+                          {l.subtitle ?? "—"}
+                        </TableCell>
                         <TableCell>{l.level ?? "—"}</TableCell>
                         <TableCell>{l.topic ?? "—"}</TableCell>
                         <TableCell>{l.grammar ?? "—"}</TableCell>
+                        <TableCell>
+                          <StatusBadge tone={statusTone(l.status)}>{l.status}</StatusBadge>
+                        </TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
@@ -270,10 +325,26 @@ function StudentDetail() {
           </Card>
         </TabsContent>
 
-        <TabsContent value="projects" className="mt-4">
+        <TabsContent value="assignments" className="mt-4 space-y-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <p className="text-sm text-muted-foreground">
+              {data.assign.length} assignment{data.assign.length === 1 ? "" : "s"} for this student.
+            </p>
+            <Button onClick={() => setAssignmentFormOpen(true)}>
+              <Plus className="size-4" /> Add Assignment
+            </Button>
+          </div>
           <Card className="shadow-soft overflow-hidden">
-            {data.proj.length === 0 ? (
-              <EmptyState title="No projects available." />
+            {data.assign.length === 0 ? (
+              <EmptyState
+                title="No assignments yet."
+                description="Create an assignment for this student."
+                action={
+                  <Button onClick={() => setAssignmentFormOpen(true)}>
+                    <Plus className="size-4" /> Add Assignment
+                  </Button>
+                }
+              />
             ) : (
               <div className="overflow-x-auto">
                 <Table>
@@ -288,14 +359,83 @@ function StudentDetail() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
+                    {data.assign.map((a) => (
+                      <TableRow key={a.id}>
+                        <TableCell className="font-medium">{a.title}</TableCell>
+                        <TableCell>{a.type}</TableCell>
+                        <TableCell>{formatDate(a.assigned_date)}</TableCell>
+                        <TableCell>{formatDate(a.due_date)}</TableCell>
+                        <TableCell>
+                          <StatusBadge
+                            tone={statusTone(effectiveAssignmentStatus(a.status, a.due_date))}
+                          >
+                            {effectiveAssignmentStatus(a.status, a.due_date)}
+                          </StatusBadge>
+                        </TableCell>
+                        <TableCell>
+                          {a.score === null || a.score === undefined
+                            ? "—"
+                            : a.max_score
+                              ? `${a.score}/${a.max_score}`
+                              : a.score}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="projects" className="mt-4 space-y-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <p className="text-sm text-muted-foreground">
+              {data.proj.length} project{data.proj.length === 1 ? "" : "s"} for this student.
+            </p>
+            <Button onClick={() => setProjectFormOpen(true)}>
+              <Plus className="size-4" /> Add Project
+            </Button>
+          </div>
+          <Card className="shadow-soft overflow-hidden">
+            {data.proj.length === 0 ? (
+              <EmptyState
+                title="No projects yet."
+                description="Create a project for this student."
+                action={
+                  <Button onClick={() => setProjectFormOpen(true)}>
+                    <Plus className="size-4" /> Add Project
+                  </Button>
+                }
+              />
+            ) : (
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Title</TableHead>
+                      <TableHead>Type</TableHead>
+                      <TableHead>Start</TableHead>
+                      <TableHead>Due</TableHead>
+                      <TableHead>Progress</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Score</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
                     {data.proj.map((p) => (
                       <TableRow key={p.id}>
                         <TableCell className="font-medium">{p.title}</TableCell>
                         <TableCell>{p.type}</TableCell>
                         <TableCell>{formatDate(p.assigned_date)}</TableCell>
                         <TableCell>{formatDate(p.due_date)}</TableCell>
+                        <TableCell>{p.progress}%</TableCell>
                         <TableCell>
-                          <StatusBadge tone={statusTone(p.status)}>{p.status}</StatusBadge>
+                          <StatusBadge
+                            tone={statusTone(effectiveProjectStatus(p.status, p.due_date))}
+                          >
+                            {effectiveProjectStatus(p.status, p.due_date)}
+                          </StatusBadge>
                         </TableCell>
                         <TableCell>{p.score ?? "—"}</TableCell>
                       </TableRow>
@@ -413,6 +553,26 @@ function StudentDetail() {
       </Tabs>
 
       <StudentFormDialog open={editOpen} onOpenChange={setEditOpen} student={student} />
+      <LessonFormDialog
+        open={lessonFormOpen}
+        onOpenChange={setLessonFormOpen}
+        students={students.data ?? []}
+        presetStudentId={id}
+      />
+      <AssignmentFormDialog
+        open={assignmentFormOpen}
+        onOpenChange={setAssignmentFormOpen}
+        students={students.data ?? []}
+        lessons={lessons.data ?? []}
+        presetStudentId={id}
+      />
+      <ProjectFormDialog
+        open={projectFormOpen}
+        onOpenChange={setProjectFormOpen}
+        students={students.data ?? []}
+        lessons={lessons.data ?? []}
+        presetStudentId={id}
+      />
     </div>
   );
 }

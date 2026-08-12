@@ -1,6 +1,7 @@
 import { supabase } from "@/integrations/supabase/client";
 import type { TablesInsert, TablesUpdate } from "@/integrations/supabase/types";
 import type {
+  Assignment,
   Attendance,
   Lesson,
   LevelRow,
@@ -10,6 +11,9 @@ import type {
   Project,
   Student,
 } from "./domain";
+import type { Tables } from "@/integrations/supabase/types";
+
+type SettingsRow = Tables<"settings">;
 
 function unwrap<T>({ data, error }: { data: T | null; error: { message: string } | null }): T {
   if (error) throw new Error(error.message);
@@ -30,7 +34,6 @@ export const api = {
     await supabase.from("progress").insert({ student_id: student.id });
     return student;
   },
-
 
   async updateStudent(id: string, values: TablesUpdate<"students">) {
     return unwrap(await supabase.from("students").update(values).eq("id", id).select().single());
@@ -63,14 +66,34 @@ export const api = {
   async lessons(): Promise<Lesson[]> {
     return unwrap(await supabase.from("lessons").select("*").order("date", { ascending: false }));
   },
-  async saveLesson(values: TablesInsert<"lessons">, id?: string) {
-    const { error } = id
-      ? await supabase.from("lessons").update(values).eq("id", id)
-      : await supabase.from("lessons").insert(values);
+  async createLesson(values: TablesInsert<"lessons">): Promise<Lesson> {
+    return unwrap<Lesson>(await supabase.from("lessons").insert(values).select().single());
+  },
+  async updateLesson(id: string, values: TablesUpdate<"lessons">) {
+    const { error } = await supabase.from("lessons").update(values).eq("id", id);
     if (error) throw new Error(error.message);
   },
   async deleteLesson(id: string) {
     const { error } = await supabase.from("lessons").delete().eq("id", id);
+    if (error) throw new Error(error.message);
+  },
+
+  async assignments(): Promise<Assignment[]> {
+    return unwrap(
+      await supabase.from("assignments").select("*").order("assigned_date", { ascending: false }),
+    );
+  },
+  async createAssignment(values: TablesInsert<"assignments">): Promise<Assignment> {
+    return unwrap<Assignment>(
+      await supabase.from("assignments").insert(values).select().single(),
+    );
+  },
+  async updateAssignment(id: string, values: TablesUpdate<"assignments">) {
+    const { error } = await supabase.from("assignments").update(values).eq("id", id);
+    if (error) throw new Error(error.message);
+  },
+  async deleteAssignment(id: string) {
+    const { error } = await supabase.from("assignments").delete().eq("id", id);
     if (error) throw new Error(error.message);
   },
 
@@ -79,10 +102,11 @@ export const api = {
       await supabase.from("projects").select("*").order("assigned_date", { ascending: false }),
     );
   },
-  async saveProject(values: TablesInsert<"projects">, id?: string) {
-    const { error } = id
-      ? await supabase.from("projects").update(values).eq("id", id)
-      : await supabase.from("projects").insert(values);
+  async createProject(values: TablesInsert<"projects">): Promise<Project> {
+    return unwrap<Project>(await supabase.from("projects").insert(values).select().single());
+  },
+  async updateProject(id: string, values: TablesUpdate<"projects">) {
+    const { error } = await supabase.from("projects").update(values).eq("id", id);
     if (error) throw new Error(error.message);
   },
   async deleteProject(id: string) {
@@ -123,15 +147,17 @@ export const api = {
       await supabase.from("monthly_reports").select("*").order("created_at", { ascending: false }),
     );
   },
-  async saveReport(values: TablesInsert<"monthly_reports">) {
-    return unwrap(await supabase.from("monthly_reports").insert(values).select().single());
+  async saveReport(values: TablesInsert<"monthly_reports">): Promise<MonthlyReport> {
+    return unwrap<MonthlyReport>(
+      await supabase.from("monthly_reports").insert(values).select().single(),
+    );
   },
   async deleteReport(id: string) {
     const { error } = await supabase.from("monthly_reports").delete().eq("id", id);
     if (error) throw new Error(error.message);
   },
 
-  async settings() {
+  async settings(): Promise<SettingsRow> {
     return unwrap(await supabase.from("settings").select("*").eq("id", 1).single());
   },
   async saveSettings(values: TablesUpdate<"settings">) {
@@ -145,6 +171,7 @@ export const qk = {
   student: (id: string) => ["students", id] as const,
   attendance: ["attendance"] as const,
   lessons: ["lessons"] as const,
+  assignments: ["assignments"] as const,
   projects: ["projects"] as const,
   progress: ["progress"] as const,
   progressHistory: (id?: string) => ["progress_history", id ?? "all"] as const,

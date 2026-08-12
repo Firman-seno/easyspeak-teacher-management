@@ -5,6 +5,8 @@ import { api, qk } from "@/lib/api";
 export const useStudents = () => useQuery({ queryKey: qk.students, queryFn: api.students });
 export const useAttendance = () => useQuery({ queryKey: qk.attendance, queryFn: api.attendance });
 export const useLessons = () => useQuery({ queryKey: qk.lessons, queryFn: api.lessons });
+export const useAssignments = () =>
+  useQuery({ queryKey: qk.assignments, queryFn: api.assignments });
 export const useProjects = () => useQuery({ queryKey: qk.projects, queryFn: api.projects });
 export const useProgress = () => useQuery({ queryKey: qk.progress, queryFn: api.progress });
 export const useLevels = () => useQuery({ queryKey: qk.levels, queryFn: api.levels });

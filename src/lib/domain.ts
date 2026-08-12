@@ -3,6 +3,7 @@ import type { Tables } from "@/integrations/supabase/types";
 export type Student = Tables<"students">;
 export type Attendance = Tables<"attendance">;
 export type Lesson = Tables<"lessons">;
+export type Assignment = Tables<"assignments">;
 export type Project = Tables<"projects">;
 export type Progress = Tables<"progress">;
 export type ProgressHistory = Tables<"progress_history">;
@@ -18,20 +19,42 @@ export const PROGRAMS = [
   "Kids English",
 ] as const;
 export const STUDENT_STATUSES = ["Active", "Inactive", "Completed", "Suspended"] as const;
+export const LESSON_STATUSES = ["Planned", "In Progress", "Completed"] as const;
 export const ATTENDANCE_STATUSES = ["Present", "Late", "Excused", "Absent"] as const;
+export const ASSIGNMENT_TYPES = [
+  "Vocabulary Quiz",
+  "Grammar Exercise",
+  "Reading Task",
+  "Writing Task",
+  "Speaking Practice",
+  "Listening Practice",
+  "Homework",
+  "Worksheet",
+  "Mini Test",
+  "Other",
+] as const;
+export const ASSIGNMENT_STATUSES = [
+  "Assigned",
+  "In Progress",
+  "Submitted",
+  "Reviewed",
+  "Completed",
+  "Overdue",
+] as const;
 export const PROJECT_TYPES = [
-  "Speaking",
-  "Writing",
-  "Reading",
-  "Listening",
-  "Presentation",
+  "Speaking Video Project",
+  "Final Presentation",
+  "English Portfolio",
+  "Roleplay Project",
+  "Group Project",
+  "Final Speaking Project",
+  "Monthly English Project",
   "Video Project",
-  "Vocabulary",
-  "Grammar",
+  "Presentation",
   "Other",
 ] as const;
 export const PROJECT_STATUSES = [
-  "Assigned",
+  "Planned",
   "In Progress",
   "Submitted",
   "Reviewed",
@@ -110,7 +133,7 @@ export function projectStats(projects: Pick<Project, "status">[]) {
   const completed = count("Completed");
   return {
     total: projects.length,
-    assigned: count("Assigned"),
+    planned: count("Planned"),
     inProgress: count("In Progress"),
     submitted: count("Submitted"),
     reviewed: count("Reviewed"),
@@ -137,5 +160,27 @@ export function initials(name: string) {
 }
 
 export function todayISO() {
-  return new Date().toISOString().slice(0, 10);
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+export function effectiveAssignmentStatus(status: string, dueDate?: string | null): string {
+  if (
+    (status === "Assigned" || status === "In Progress") &&
+    dueDate &&
+    dueDate < todayISO()
+  ) {
+    return "Overdue";
+  }
+  return status;
+}
+
+export function effectiveProjectStatus(status: string, dueDate?: string | null): string {
+  if ((status === "Planned" || status === "In Progress") && dueDate && dueDate < todayISO()) {
+    return "Overdue";
+  }
+  return status;
 }

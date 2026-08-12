@@ -2,7 +2,7 @@ import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 
 import { MONTHS, SKILLS, formatDate } from "./domain";
-import type { Lesson, MonthlyReport, Project, Student } from "./domain";
+import type { Assignment, Lesson, MonthlyReport, Project, Student } from "./domain";
 
 const NAVY: [number, number, number] = [23, 37, 66];
 const BLUE: [number, number, number] = [37, 84, 199];
@@ -12,6 +12,7 @@ export type ReportPdfInput = {
   report: MonthlyReport;
   student: Student;
   lessons: Lesson[];
+  assignments: Assignment[];
   projects: Project[];
   schoolName: string;
   teacherName: string;
@@ -21,6 +22,7 @@ export function buildReportPdf({
   report,
   student,
   lessons,
+  assignments,
   projects,
   schoolName,
   teacherName,
@@ -97,19 +99,48 @@ export function buildReportPdf({
     ],
   );
 
-  section("Lessons & Projects");
+  section("Lessons");
   table(
-    ["Lessons Completed", "Projects Assigned", "Projects Completed", "Project Completion"],
+    ["Total", "Completed", "In Progress", "Planned", "Completion"],
     [
       [
+        report.lessons_total,
         report.lessons_completed,
-        report.projects_assigned,
+        report.lessons_in_progress,
+        report.lessons_planned,
+        `${report.lessons_completed_percent}%`,
+      ],
+    ],
+  );
+
+  section("Assignments");
+  table(
+    ["Total", "Completed", "In Progress", "Submitted", "Overdue", "Avg Score", "Completion"],
+    [
+      [
+        report.assignments_total,
+        report.assignments_completed,
+        report.assignments_in_progress,
+        report.assignments_submitted,
+        report.assignments_overdue,
+        report.assignments_avg_score ?? "-",
+        `${report.assignments_completion_percent}%`,
+      ],
+    ],
+  );
+
+  section("Projects");
+  table(
+    ["Total", "Completed", "In Progress", "Submitted", "Overdue", "Avg Score", "Completion"],
+    [
+      [
+        report.projects_total,
         report.projects_completed,
-        `${
-          report.projects_assigned
-            ? Math.round((report.projects_completed / report.projects_assigned) * 100)
-            : 0
-        }%`,
+        report.projects_in_progress,
+        report.projects_submitted,
+        report.projects_overdue,
+        report.projects_avg_score ?? "-",
+        `${report.projects_completion_percent}%`,
       ],
     ],
   );
@@ -131,6 +162,20 @@ export function buildReportPdf({
     table(
       ["Date", "Title", "Topic", "Grammar"],
       lessons.map((l) => [formatDate(l.date), l.title, l.topic ?? "-", l.grammar ?? "-"]),
+    );
+  }
+
+  if (assignments.length) {
+    section("Assignments Completed");
+    table(
+      ["Title", "Type", "Status", "Score", "Due"],
+      assignments.map((a) => [
+        a.title,
+        a.type,
+        a.status ?? "-",
+        a.max_score ? `${a.score ?? "-"} / ${a.max_score}` : (a.score ?? "-"),
+        formatDate(a.due_date),
+      ]),
     );
   }
 
@@ -156,7 +201,10 @@ export function buildReportPdf({
     y += lines.length * 14 + 18;
   };
 
+  paragraph("Strengths", report.strengths ?? "");
+  paragraph("Areas to Improve", report.areas_to_improve ?? "");
   paragraph("Teacher's Evaluation", report.teacher_evaluation ?? "");
+  paragraph("Next Month's Goals", report.next_month_goals ?? "");
   paragraph("Recommendations", report.recommendations ?? "");
 
   if (y > 640) {

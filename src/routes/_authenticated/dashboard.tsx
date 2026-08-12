@@ -5,6 +5,7 @@ import {
   CheckCircle2,
   ClipboardList,
   FileBarChart,
+  FolderKanban,
   Percent,
   TrendingUp,
   TriangleAlert,
@@ -29,8 +30,22 @@ import {
 import { PageHeader, StatCard } from "@/components/kit";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { useAttendance, useProgress, useProjects, useStudents } from "@/hooks/use-data";
-import { LEVELS, summarizeAttendance, todayISO } from "@/lib/domain";
+import {
+  useAssignments,
+  useAttendance,
+  useProgress,
+  useProjects,
+  useStudents,
+} from "@/hooks/use-data";
+import {
+  ASSIGNMENT_STATUSES,
+  LEVELS,
+  PROJECT_STATUSES,
+  effectiveAssignmentStatus,
+  effectiveProjectStatus,
+  summarizeAttendance,
+  todayISO,
+} from "@/lib/domain";
 
 export const Route = createFileRoute("/_authenticated/dashboard")({
   head: () => ({
@@ -39,12 +54,12 @@ export const Route = createFileRoute("/_authenticated/dashboard")({
       {
         name: "description",
         content:
-          "Overview of student attendance, learning progress, project completion and CEFR level distribution.",
+          "Overview of student attendance, learning progress, assignment and project completion, and CEFR level distribution.",
       },
       { property: "og:title", content: "Dashboard — EasySpeak Teacher Management" },
       {
         property: "og:description",
-        content: "Live teaching statistics: attendance, progress, projects and levels.",
+        content: "Live teaching statistics: attendance, progress, assignments, projects and levels.",
       },
     ],
   }),
@@ -64,6 +79,7 @@ const CHART_COLORS = [
 function Dashboard() {
   const students = useStudents();
   const attendance = useAttendance();
+  const assignments = useAssignments();
   const projects = useProjects();
   const progress = useProgress();
 
@@ -74,6 +90,7 @@ function Dashboard() {
     const today = todayISO();
     const month = today.slice(0, 7);
     const monthRecords = records.filter((r) => r.date.startsWith(month));
+    const assign = assignments.data ?? [];
     const proj = projects.data ?? [];
     const prog = progress.data ?? [];
 
@@ -118,25 +135,41 @@ function Dashboard() {
       value: all.filter((s) => s.current_level === l).length,
     })).filter((l) => l.value > 0);
 
-    const projectSeries = ["Assigned", "In Progress", "Submitted", "Reviewed", "Completed"].map(
-      (status) => ({ name: status, value: proj.filter((p) => p.status === status).length }),
-    );
+    const countByStatus = (
+      rows: { status: string; due_date: string | null }[],
+      statuses: readonly string[],
+      effective: (status: string, dueDate?: string | null) => string,
+    ) =>
+      statuses.map((s) => ({
+        name: s,
+        value: rows.filter((r) => effective(r.status, r.due_date) === s).length,
+      }));
+
+    const assignmentSeries = countByStatus(assign, ASSIGNMENT_STATUSES, effectiveAssignmentStatus);
+    const projectSeries = countByStatus(proj, PROJECT_STATUSES, effectiveProjectStatus);
+
+    const assignmentCounts = Object.fromEntries(assignmentSeries.map((s) => [s.name, s.value]));
+    const projectCounts = Object.fromEntries(projectSeries.map((s) => [s.name, s.value]));
 
     return {
       totalStudents: active.length,
       todayAttendance: records.filter((r) => r.date === today && r.status !== "Absent").length,
       monthRate: summarizeAttendance(monthRecords).rate,
-      activeProjects: proj.filter((p) => p.status === "In Progress" || p.status === "Assigned")
-        .length,
-      completedProjects: proj.filter((p) => p.status === "Completed").length,
+      activeAssignments:
+        (assignmentCounts["Assigned"] ?? 0) + (assignmentCounts["In Progress"] ?? 0),
+      completedAssignments: assignmentCounts["Completed"] ?? 0,
+      activeProjects:
+        (projectCounts["Planned"] ?? 0) + (projectCounts["In Progress"] ?? 0),
+      completedProjects: projectCounts["Completed"] ?? 0,
       avgProgress,
       attention: attention.length,
       attendanceSeries,
       progressSeries,
       levelSeries,
+      assignmentSeries,
       projectSeries,
     };
-  }, [students.data, attendance.data, projects.data, progress.data]);
+  }, [students.data, attendance.data, assignments.data, projects.data, progress.data]);
 
   return (
     <div className="space-y-6">
@@ -161,8 +194,13 @@ function Dashboard() {
               </Link>
             </Button>
             <Button asChild size="sm" variant="outline">
+              <Link to="/assignments">
+                <ClipboardList className="size-4" /> Add Assignment
+              </Link>
+            </Button>
+            <Button asChild size="sm" variant="outline">
               <Link to="/projects">
-                <ClipboardList className="size-4" /> Add Project
+                <FolderKanban className="size-4" /> Add Project
               </Link>
             </Button>
             <Button asChild size="sm" variant="outline">
@@ -201,23 +239,36 @@ function Dashboard() {
           icon={<Percent className="size-5" />}
         />
         <StatCard
-          label="Active Projects"
-          value={data.activeProjects}
+          label="Average Progress"
+          value={`${data.avgProgress}%`}
+          hint="All students"
+          icon={<TrendingUp className="size-5" />}
+        />
+        <StatCard
+          label="Active Assignments"
+          value={data.activeAssignments}
           hint="Assigned or in progress"
           tone="warning"
           icon={<ClipboardList className="size-5" />}
+        />
+        <StatCard
+          label="Completed Assignments"
+          value={data.completedAssignments}
+          tone="success"
+          icon={<CheckCircle2 className="size-5" />}
+        />
+        <StatCard
+          label="Active Projects"
+          value={data.activeProjects}
+          hint="Planned or in progress"
+          tone="warning"
+          icon={<FolderKanban className="size-5" />}
         />
         <StatCard
           label="Completed Projects"
           value={data.completedProjects}
           tone="success"
           icon={<CheckCircle2 className="size-5" />}
-        />
-        <StatCard
-          label="Average Progress"
-          value={`${data.avgProgress}%`}
-          hint="All students"
-          icon={<TrendingUp className="size-5" />}
         />
         <StatCard
           label="Needing Attention"
@@ -287,6 +338,23 @@ function Dashboard() {
                 </Pie>
                 <Tooltip />
               </PieChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+
+        <Card className="shadow-soft">
+          <CardHeader>
+            <CardTitle className="text-base">Assignment Completion</CardTitle>
+          </CardHeader>
+          <CardContent className="h-72">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={data.assignmentSeries} layout="vertical">
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+                <XAxis type="number" allowDecimals={false} fontSize={12} />
+                <YAxis type="category" dataKey="name" width={90} fontSize={12} />
+                <Tooltip />
+                <Bar dataKey="value" fill="var(--chart-4)" radius={[0, 6, 6, 0]} />
+              </BarChart>
             </ResponsiveContainer>
           </CardContent>
         </Card>

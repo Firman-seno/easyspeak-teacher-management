@@ -14,6 +14,78 @@ export type Database = {
   }
   public: {
     Tables: {
+      assignments: {
+        Row: {
+          assigned_date: string
+          attachment: string | null
+          created_at: string
+          description: string | null
+          due_date: string | null
+          id: string
+          instructions: string | null
+          lesson_id: string | null
+          max_score: number | null
+          score: number | null
+          status: string
+          student_id: string
+          teacher_notes: string | null
+          title: string
+          type: string
+          updated_at: string
+        }
+        Insert: {
+          assigned_date?: string
+          attachment?: string | null
+          created_at?: string
+          description?: string | null
+          due_date?: string | null
+          id?: string
+          instructions?: string | null
+          lesson_id?: string | null
+          max_score?: number | null
+          score?: number | null
+          status?: string
+          student_id: string
+          teacher_notes?: string | null
+          title: string
+          type?: string
+          updated_at?: string
+        }
+        Update: {
+          assigned_date?: string
+          attachment?: string | null
+          created_at?: string
+          description?: string | null
+          due_date?: string | null
+          id?: string
+          instructions?: string | null
+          lesson_id?: string | null
+          max_score?: number | null
+          score?: number | null
+          status?: string
+          student_id?: string
+          teacher_notes?: string | null
+          title?: string
+          type?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "assignments_lesson_id_fkey"
+            columns: ["lesson_id"]
+            isOneToOne: false
+            referencedRelation: "lessons"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "assignments_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       attendance: {
         Row: {
           check_in_time: string | null
@@ -57,6 +129,8 @@ export type Database = {
       }
       lessons: {
         Row: {
+          attachment: string | null
+          content: string | null
           created_at: string
           date: string
           duration: number | null
@@ -68,12 +142,19 @@ export type Database = {
           objective: string | null
           program: string | null
           speaking_practice: string | null
+          status: string
+          student_id: string | null
+          subtitle: string | null
+          success_indicator: string | null
           title: string
           topic: string | null
           unit: string | null
+          updated_at: string
           vocabulary: string | null
         }
         Insert: {
+          attachment?: string | null
+          content?: string | null
           created_at?: string
           date?: string
           duration?: number | null
@@ -85,12 +166,19 @@ export type Database = {
           objective?: string | null
           program?: string | null
           speaking_practice?: string | null
+          status?: string
+          student_id?: string | null
+          subtitle?: string | null
+          success_indicator?: string | null
           title: string
           topic?: string | null
           unit?: string | null
+          updated_at?: string
           vocabulary?: string | null
         }
         Update: {
+          attachment?: string | null
+          content?: string | null
           created_at?: string
           date?: string
           duration?: number | null
@@ -102,12 +190,25 @@ export type Database = {
           objective?: string | null
           program?: string | null
           speaking_practice?: string | null
+          status?: string
+          student_id?: string | null
+          subtitle?: string | null
+          success_indicator?: string | null
           title?: string
           topic?: string | null
           unit?: string | null
+          updated_at?: string
           vocabulary?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "lessons_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       levels: {
         Row: {
@@ -136,20 +237,40 @@ export type Database = {
       monthly_reports: {
         Row: {
           absent: number
+          areas_to_improve: string | null
+          assignments_avg_score: number | null
+          assignments_completed: number
+          assignments_completion_percent: number
+          assignments_in_progress: number
+          assignments_overdue: number
+          assignments_submitted: number
+          assignments_total: number
           attendance_rate: number
           created_at: string
           excused: number
           id: string
           late: number
           lessons_completed: number
+          lessons_completed_percent: number
+          lessons_in_progress: number
+          lessons_planned: number
+          lessons_total: number
           level: string | null
           month: number
+          next_month_goals: string | null
           overall_progress: number
           present: number
           projects_assigned: number
+          projects_avg_score: number | null
           projects_completed: number
+          projects_completion_percent: number
+          projects_in_progress: number
+          projects_overdue: number
+          projects_submitted: number
+          projects_total: number
           recommendations: string | null
           skills: Json
+          strengths: string | null
           student_id: string
           teacher_evaluation: string | null
           total_meetings: number
@@ -157,20 +278,40 @@ export type Database = {
         }
         Insert: {
           absent?: number
+          areas_to_improve?: string | null
+          assignments_avg_score?: number | null
+          assignments_completed?: number
+          assignments_completion_percent?: number
+          assignments_in_progress?: number
+          assignments_overdue?: number
+          assignments_submitted?: number
+          assignments_total?: number
           attendance_rate?: number
           created_at?: string
           excused?: number
           id?: string
           late?: number
           lessons_completed?: number
+          lessons_completed_percent?: number
+          lessons_in_progress?: number
+          lessons_planned?: number
+          lessons_total?: number
           level?: string | null
           month: number
+          next_month_goals?: string | null
           overall_progress?: number
           present?: number
           projects_assigned?: number
+          projects_avg_score?: number | null
           projects_completed?: number
+          projects_completion_percent?: number
+          projects_in_progress?: number
+          projects_overdue?: number
+          projects_submitted?: number
+          projects_total?: number
           recommendations?: string | null
           skills?: Json
+          strengths?: string | null
           student_id: string
           teacher_evaluation?: string | null
           total_meetings?: number
@@ -178,20 +319,40 @@ export type Database = {
         }
         Update: {
           absent?: number
+          areas_to_improve?: string | null
+          assignments_avg_score?: number | null
+          assignments_completed?: number
+          assignments_completion_percent?: number
+          assignments_in_progress?: number
+          assignments_overdue?: number
+          assignments_submitted?: number
+          assignments_total?: number
           attendance_rate?: number
           created_at?: string
           excused?: number
           id?: string
           late?: number
           lessons_completed?: number
+          lessons_completed_percent?: number
+          lessons_in_progress?: number
+          lessons_planned?: number
+          lessons_total?: number
           level?: string | null
           month?: number
+          next_month_goals?: string | null
           overall_progress?: number
           present?: number
           projects_assigned?: number
+          projects_avg_score?: number | null
           projects_completed?: number
+          projects_completion_percent?: number
+          projects_in_progress?: number
+          projects_overdue?: number
+          projects_submitted?: number
+          projects_total?: number
           recommendations?: string | null
           skills?: Json
+          strengths?: string | null
           student_id?: string
           teacher_evaluation?: string | null
           total_meetings?: number
@@ -297,57 +458,88 @@ export type Database = {
       }
       projects: {
         Row: {
-          assigned_date: string
+          attachment: string | null
           completed_date: string | null
           created_at: string
           description: string | null
           due_date: string | null
-          feedback: string | null
           id: string
           instructions: string | null
+          lesson_id: string | null
           level: string | null
+          objective: string | null
+          progress: number
           program: string | null
           score: number | null
+          assigned_date: string
           status: string
-          student_id: string | null
+          student_id: string
+          submission_date: string | null
+          submission_link: string | null
+          feedback: string | null
+          teacher_notes: string | null
           title: string
           type: string
+          updated_at: string
         }
         Insert: {
-          assigned_date?: string
+          attachment?: string | null
           completed_date?: string | null
           created_at?: string
           description?: string | null
           due_date?: string | null
-          feedback?: string | null
           id?: string
           instructions?: string | null
+          lesson_id?: string | null
           level?: string | null
+          objective?: string | null
+          progress?: number
           program?: string | null
           score?: number | null
+          assigned_date?: string
           status?: string
-          student_id?: string | null
+          student_id: string
+          submission_date?: string | null
+          submission_link?: string | null
+          feedback?: string | null
+          teacher_notes?: string | null
           title: string
           type?: string
+          updated_at?: string
         }
         Update: {
-          assigned_date?: string
+          attachment?: string | null
           completed_date?: string | null
           created_at?: string
           description?: string | null
           due_date?: string | null
-          feedback?: string | null
           id?: string
           instructions?: string | null
+          lesson_id?: string | null
           level?: string | null
+          objective?: string | null
+          progress?: number
           program?: string | null
           score?: number | null
+          assigned_date?: string
           status?: string
-          student_id?: string | null
+          student_id?: string
+          submission_date?: string | null
+          submission_link?: string | null
+          feedback?: string | null
+          teacher_notes?: string | null
           title?: string
           type?: string
+          updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "projects_lesson_id_fkey"
+            columns: ["lesson_id"]
+            isOneToOne: false
+            referencedRelation: "lessons"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "projects_student_id_fkey"
             columns: ["student_id"]
