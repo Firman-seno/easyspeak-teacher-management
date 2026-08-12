@@ -19,11 +19,13 @@ export function StudentCombobox({
   value,
   onChange,
   disabled,
+  allOption,
 }: {
   students: Student[];
   value: string;
   onChange: (id: string, student: Student | undefined) => void;
   disabled?: boolean;
+  allOption?: { label: string; value: string };
 }) {
   const [open, setOpen] = useState(false);
   const selected = students.find((s) => s.id === value);
@@ -49,6 +51,11 @@ export function StudentCombobox({
                 </span>
               </span>
             </span>
+          ) : allOption && value === allOption.value ? (
+            <span className="flex min-w-0 items-center gap-2 truncate">
+              <UserRound className="size-4 shrink-0 text-muted-foreground" />
+              <span className="truncate">{allOption.label}</span>
+            </span>
           ) : (
             <span className="flex items-center gap-2 text-muted-foreground">
               <UserRound className="size-4 shrink-0" /> Search student…
@@ -57,11 +64,34 @@ export function StudentCombobox({
           <ChevronsUpDown className="ml-2 size-4 shrink-0 opacity-50" />
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-[min(90vw,var(--radix-popover-trigger-width))] p-0" align="start">
+      <PopoverContent
+        className="w-[min(90vw,var(--radix-popover-trigger-width))] p-0"
+        align="start"
+      >
         <Command>
           <CommandInput placeholder="Search student by name…" />
           <CommandList>
             <CommandEmpty>No student found.</CommandEmpty>
+            {allOption ? (
+              <CommandGroup>
+                <CommandItem
+                  key={allOption.value}
+                  value={allOption.value}
+                  onSelect={() => {
+                    onChange(allOption.value, undefined);
+                    setOpen(false);
+                  }}
+                >
+                  <Check
+                    className={cn(
+                      "mr-2 size-4",
+                      value === allOption.value ? "opacity-100" : "opacity-0",
+                    )}
+                  />
+                  <span className="truncate">{allOption.label}</span>
+                </CommandItem>
+              </CommandGroup>
+            ) : null}
             <CommandGroup heading="Students">
               {students.map((s) => (
                 <CommandItem
@@ -73,10 +103,7 @@ export function StudentCombobox({
                   }}
                 >
                   <Check
-                    className={cn(
-                      "mr-2 size-4",
-                      value === s.id ? "opacity-100" : "opacity-0",
-                    )}
+                    className={cn("mr-2 size-4", value === s.id ? "opacity-100" : "opacity-0")}
                   />
                   <div className="min-w-0">
                     <p className="truncate">{s.name}</p>
@@ -132,7 +159,10 @@ export function LessonCombobox({
           <ChevronsUpDown className="ml-2 size-4 shrink-0 opacity-50" />
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-[min(90vw,var(--radix-popover-trigger-width))] p-0" align="start">
+      <PopoverContent
+        className="w-[min(90vw,var(--radix-popover-trigger-width))] p-0"
+        align="start"
+      >
         <Command>
           <CommandInput placeholder="Search lesson…" />
           <CommandList>

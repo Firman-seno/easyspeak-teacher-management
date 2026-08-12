@@ -1,9 +1,10 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 import { Save, Trash2 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
+import { StudentCombobox } from "@/components/entity-comboboxes";
 import { ConfirmDialog, EmptyState, PageHeader, StatusBadge, statusTone } from "@/components/kit";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -35,7 +36,8 @@ export const Route = createFileRoute("/_authenticated/attendance")({
       { title: "Attendance — EasySpeak Teacher Management" },
       {
         name: "description",
-        content: "Record and edit daily student attendance with present, late, excused and absent status.",
+        content:
+          "Record and edit daily student attendance with present, late, excused and absent status.",
       },
       { property: "og:title", content: "Attendance — EasySpeak Teacher Management" },
       { property: "og:description", content: "Fast daily attendance entry for every class." },
@@ -43,8 +45,6 @@ export const Route = createFileRoute("/_authenticated/attendance")({
   }),
   component: AttendancePage,
 });
-
-type Draft = { status: string; time: string; notes: string };
 
 function AttendancePage() {
   const qc = useQueryClient();
@@ -54,14 +54,18 @@ function AttendancePage() {
   const [date, setDate] = useState(todayISO());
   const [program, setProgram] = useState("all");
   const [meeting, setMeeting] = useState("");
-  const [drafts, setDrafts] = useState<Record<string, Draft>>({});
+
+  const [selectedStudent, setSelectedStudent] = useState("");
+  const [status, setStatus] = useState("Present");
+  const [time, setTime] = useState("09:00");
+  const [notes, setNotes] = useState("");
 
   const [filterStudent, setFilterStudent] = useState("all");
   const [filterStatus, setFilterStatus] = useState("all");
   const [filterMonth, setFilterMonth] = useState("");
   const [toDelete, setToDelete] = useState<Attendance | null>(null);
 
-  const roster = useMemo(
+  const availableStudents = useMemo(
     () =>
       (students.data ?? []).filter(
         (s) => s.status === "Active" && (program === "all" || s.program === program),
@@ -75,38 +79,45 @@ function AttendancePage() {
     return map;
   }, [attendance.data, date]);
 
-  const getDraft = (studentId: string): Draft => {
-    const record = existing.get(studentId);
-    return (
-      drafts[studentId] ?? {
-        status: record?.status ?? "Present",
-        time: record?.check_in_time ?? "09:00",
-        notes: record?.notes ?? "",
-      }
-    );
+  useEffect(() => {
+    if (!selectedStudent) {
+      setStatus("Present");
+      setTime("09:00");
+      setNotes("");
+      return;
+    }
+    const record = existing.get(selectedStudent);
+    setStatus(record?.status ?? "Present");
+    setTime(record?.check_in_time ?? "09:00");
+    setNotes(record?.notes ?? "");
+  }, [selectedStudent, existing]);
+
+  const resetForm = () => {
+    setSelectedStudent("");
+    setStatus("Present");
+    setTime("09:00");
+    setNotes("");
   };
 
-  const setDraft = (studentId: string, patch: Partial<Draft>) =>
-    setDrafts((d) => ({ ...d, [studentId]: { ...getDraft(studentId), ...patch } }));
-
   const save = useMutation({
-    mutationFn: () =>
-      api.upsertAttendance(
-        roster.map((s) => {
-          const d = getDraft(s.id);
-          return {
-            student_id: s.id,
-            date,
-            status: d.status,
-            check_in_time: d.time || null,
-            meeting: meeting || null,
-            notes: d.notes || null,
-          };
-        }),
-      ),
+    mutationFn: () => {
+      if (!selectedStudent) throw new Error("No student selected");
+      const s = availableStudents.find((st) => st.id === selectedStudent);
+      if (!s) throw new Error("Student not found");
+      return api.upsertAttendance([
+        {
+          student_id: s.id,
+          date,
+          status,
+          check_in_time: time || null,
+          meeting: meeting || null,
+          notes: notes || null,
+        },
+      ]);
+    },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: qk.attendance });
-      setDrafts({});
+      resetForm();
       toast.success("Attendance successfully saved.");
     },
     onError: () => toast.error("Something went wrong."),
@@ -132,26 +143,26 @@ function AttendancePage() {
     onError: () => toast.error("Something went wrong."),
   });
 
+  const recordsForFilters = useMemo(() => {
+    return (attendance.data ?? []).filter((r) =>
+      filterMonth ? r.date.startsWith(filterMonth) : r.date === date,
+    );
+  }, [attendance.data, date, filterMonth]);
+
   const history = useMemo(() => {
     const nameOf = new Map((students.data ?? []).map((s) => [s.id, s.name]));
-    return (attendance.data ?? [])
+    return recordsForFilters
       .filter((r) => filterStudent === "all" || r.student_id === filterStudent)
       .filter((r) => filterStatus === "all" || r.status === filterStatus)
-      .filter((r) => !filterMonth || r.date.startsWith(filterMonth))
       .slice(0, 100)
       .map((r) => ({ ...r, name: nameOf.get(r.student_id) ?? "—" }));
-  }, [attendance.data, students.data, filterStudent, filterStatus, filterMonth]);
+  }, [recordsForFilters, students.data, filterStudent, filterStatus]);
 
   return (
     <div className="space-y-6">
       <PageHeader
         title="Attendance"
-        description="Select a date and class, then mark every student in one pass."
-        actions={
-          <Button onClick={() => save.mutate()} disabled={save.isPending || roster.length === 0}>
-            <Save className="size-4" /> Save Attendance
-          </Button>
-        }
+        description="Select a date and choose a student, then mark their attendance."
       />
 
       <Card className="shadow-soft p-4">
@@ -188,67 +199,72 @@ function AttendancePage() {
         </div>
       </Card>
 
-      <Card className="shadow-soft overflow-hidden">
-        {roster.length === 0 ? (
-          <EmptyState title="No active students for this class." />
-        ) : (
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Student</TableHead>
-                  <TableHead className="w-[180px]">Status</TableHead>
-                  <TableHead className="w-[130px]">Time</TableHead>
-                  <TableHead>Notes</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {roster.map((s) => {
-                  const d = getDraft(s.id);
-                  return (
-                    <TableRow key={s.id}>
-                      <TableCell>
-                        <p className="font-medium">{s.name}</p>
-                        <p className="text-xs text-muted-foreground">{s.student_id}</p>
-                      </TableCell>
-                      <TableCell>
-                        <Select
-                          value={d.status}
-                          onValueChange={(v) => setDraft(s.id, { status: v })}
-                        >
-                          <SelectTrigger>
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {ATTENDANCE_STATUSES.map((st) => (
-                              <SelectItem key={st} value={st}>
-                                {st}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </TableCell>
-                      <TableCell>
-                        <Input
-                          type="time"
-                          value={d.time}
-                          onChange={(e) => setDraft(s.id, { time: e.target.value })}
-                        />
-                      </TableCell>
-                      <TableCell>
-                        <Input
-                          value={d.notes}
-                          placeholder="Optional note"
-                          onChange={(e) => setDraft(s.id, { notes: e.target.value })}
-                        />
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
+      <Card className="shadow-soft p-4">
+        <div className="grid gap-3 sm:grid-cols-[1fr_180px_130px_1fr_auto] sm:items-end sm:gap-3">
+          <div className="space-y-1.5">
+            <Label htmlFor="student">Student *</Label>
+            <Select value={selectedStudent} onValueChange={setSelectedStudent}>
+              <SelectTrigger id="student">
+                <SelectValue placeholder="Select student..." />
+              </SelectTrigger>
+              <SelectContent>
+                {availableStudents.length === 0 ? (
+                  <SelectItem value="empty" disabled>
+                    No active students
+                  </SelectItem>
+                ) : (
+                  availableStudents.map((s) => (
+                    <SelectItem key={s.id} value={s.id}>
+                      <span className="min-w-0 truncate whitespace-nowrap">{s.name}</span>
+                      <span className="text-xs text-muted-foreground">({s.student_id})</span>
+                    </SelectItem>
+                  ))
+                )}
+              </SelectContent>
+            </Select>
           </div>
-        )}
+
+          <div className="space-y-1.5">
+            <Label htmlFor="status">Status</Label>
+            <Select value={status} onValueChange={setStatus}>
+              <SelectTrigger id="status">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {ATTENDANCE_STATUSES.map((s) => (
+                  <SelectItem key={s} value={s}>
+                    {s}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label htmlFor="time">Time</Label>
+            <Input id="time" type="time" value={time} onChange={(e) => setTime(e.target.value)} />
+          </div>
+
+          <div className="space-y-1.5">
+            <Label htmlFor="notes">Notes</Label>
+            <Input
+              id="notes"
+              value={notes}
+              placeholder="Optional note"
+              onChange={(e) => setNotes(e.target.value)}
+            />
+          </div>
+
+          <div className="flex items-end">
+            <Button
+              className="w-full"
+              onClick={() => save.mutate()}
+              disabled={save.isPending || !selectedStudent}
+            >
+              <Save className="size-4" /> Save
+            </Button>
+          </div>
+        </div>
       </Card>
 
       <Card className="shadow-soft">
@@ -257,19 +273,12 @@ function AttendancePage() {
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid gap-3 sm:grid-cols-3">
-            <Select value={filterStudent} onValueChange={setFilterStudent}>
-              <SelectTrigger>
-                <SelectValue placeholder="Student" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All students</SelectItem>
-                {(students.data ?? []).map((s) => (
-                  <SelectItem key={s.id} value={s.id}>
-                    {s.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <StudentCombobox
+              students={students.data ?? []}
+              value={filterStudent}
+              onChange={(id) => setFilterStudent(id)}
+              allOption={{ label: "All students", value: "all" }}
+            />
             <Select value={filterStatus} onValueChange={setFilterStatus}>
               <SelectTrigger>
                 <SelectValue placeholder="Status" />
@@ -291,7 +300,13 @@ function AttendancePage() {
           </div>
 
           {history.length === 0 ? (
-            <EmptyState title="No attendance records yet." />
+            <EmptyState
+              title={
+                filterMonth
+                  ? "No attendance records found for this month."
+                  : "No attendance records found for this date."
+              }
+            />
           ) : (
             <div className="overflow-x-auto">
               <Table>
@@ -308,7 +323,9 @@ function AttendancePage() {
                 <TableBody>
                   {history.map((r) => (
                     <TableRow key={r.id}>
-                      <TableCell className="font-medium">{r.name}</TableCell>
+                      <TableCell className="min-w-0 font-medium truncate whitespace-nowrap">
+                        {r.name}
+                      </TableCell>
                       <TableCell>{formatDate(r.date)}</TableCell>
                       <TableCell>
                         <Select
