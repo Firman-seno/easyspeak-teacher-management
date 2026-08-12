@@ -127,7 +127,7 @@ function StudentDetail() {
       </Button>
 
       <Card className="shadow-soft">
-        <CardContent className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-4 p-6 sm:flex sm:items-center sm:justify-between">
+        <CardContent className="flex flex-col items-stretch gap-4 p-5 sm:flex-row sm:items-center sm:justify-between sm:p-6">
           <div className="flex min-w-0 items-center gap-4">
             <Avatar className="size-16 shrink-0">
               {student.photo && <AvatarImage src={student.photo} alt={student.name} />}
@@ -146,7 +146,7 @@ function StudentDetail() {
               </div>
             </div>
           </div>
-          <Button variant="outline" onClick={() => setEditOpen(true)}>
+          <Button variant="outline" className="shrink-0" onClick={() => setEditOpen(true)}>
             <Pencil className="size-4" /> Edit
           </Button>
         </CardContent>

@@ -149,9 +149,56 @@
     border-color: var(--color-border);
   }
 
+  html,
+  body,
+  #root {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+  }
+
+  html {
+    overflow-x: hidden;
+  }
+
   body {
     background-color: var(--color-background);
     color: var(--color-foreground);
+    line-height: 1.6;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+  }
+
+  img,
+  svg,
+  video,
+  canvas,
+  iframe {
+    max-width: 100%;
+    height: auto;
+  }
+
+  input,
+  select,
+  textarea,
+  button {
+    font: inherit;
+    min-width: 0;
+  }
+
+  h1 {
+    font-size: clamp(1.5rem, 4vw, 2.25rem);
+    line-height: 1.15;
+  }
+
+  h2 {
+    font-size: clamp(1.25rem, 3vw, 1.75rem);
+    line-height: 1.25;
+  }
+
+  h3 {
+    font-size: clamp(1.05rem, 2.5vw, 1.25rem);
+    line-height: 1.35;
   }
 }
 
@@ -170,5 +217,22 @@
 }
 
 @media print {
-  .no-print { display: none !important; }
+  html,
+  body,
+  #root {
+    width: 100%;
+    overflow: visible;
+  }
+  .no-print {
+    display: none !important;
+  }
+  .print-block {
+    display: block !important;
+  }
+  body {
+    line-height: 1.5;
+  }
+  .shadow-soft {
+    box-shadow: none !important;
+  }
 }

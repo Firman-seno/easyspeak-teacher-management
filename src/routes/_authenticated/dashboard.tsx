@@ -177,43 +177,47 @@ function Dashboard() {
         title="Dashboard"
         description="Live overview of your classes, attendance and learning progress."
         actions={
-          <>
-            <Button asChild size="sm">
+          <div className="grid w-full grid-cols-1 gap-2 sm:grid-cols-2 sm:w-auto lg:grid-cols-4">
+            <Button asChild className="min-h-12 justify-center sm:min-h-9">
               <Link to="/students">
                 <Users className="size-4" /> Add Student
               </Link>
             </Button>
-            <Button asChild size="sm" variant="outline">
+            <Button asChild variant="outline" className="min-h-12 justify-center sm:min-h-9">
               <Link to="/attendance">
                 <CalendarCheck className="size-4" /> Record Attendance
               </Link>
             </Button>
-            <Button asChild size="sm" variant="outline">
+            <Button asChild variant="outline" className="min-h-12 justify-center sm:min-h-9">
               <Link to="/lessons">
                 <BookOpen className="size-4" /> Add Lesson
               </Link>
             </Button>
-            <Button asChild size="sm" variant="outline">
+            <Button asChild variant="outline" className="min-h-12 justify-center sm:min-h-9">
               <Link to="/assignments">
                 <ClipboardList className="size-4" /> Add Assignment
               </Link>
             </Button>
-            <Button asChild size="sm" variant="outline">
+            <Button asChild variant="outline" className="min-h-12 justify-center sm:min-h-9">
               <Link to="/projects">
                 <FolderKanban className="size-4" /> Add Project
               </Link>
             </Button>
-            <Button asChild size="sm" variant="outline">
+            <Button asChild variant="outline" className="min-h-12 justify-center sm:min-h-9">
               <Link to="/progress">
                 <TrendingUp className="size-4" /> Update Progress
               </Link>
             </Button>
-            <Button asChild size="sm" variant="outline">
+            <Button
+              asChild
+              variant="outline"
+              className="min-h-12 justify-center sm:min-h-9 lg:col-span-2"
+            >
               <Link to="/reports">
                 <FileBarChart className="size-4" /> Generate Report
               </Link>
             </Button>
-          </>
+          </div>
         }
       />
 

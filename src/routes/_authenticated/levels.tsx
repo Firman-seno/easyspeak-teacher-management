@@ -161,7 +161,7 @@ function LevelsPage() {
         description="The CEFR level framework from Pre-A1 to C2, and where each student stands."
         actions={
           <Select value={selected?.id ?? ""} onValueChange={setSelectedId}>
-            <SelectTrigger className="w-[220px]">
+            <SelectTrigger className="w-full sm:w-[220px]">
               <SelectValue placeholder="Select student" />
             </SelectTrigger>
             <SelectContent>

@@ -135,8 +135,8 @@ function ReportDetail() {
 
   return (
     <div className="space-y-6">
-      <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-4 sm:flex sm:flex-wrap sm:items-center sm:justify-between print:hidden">
-        <div>
+      <div className="flex flex-col items-stretch gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between sm:gap-4 print:hidden">
+        <div className="min-w-0">
           <Button asChild variant="ghost" size="sm" className="-ml-2">
             <Link to="/reports">
               <ArrowLeft className="size-4" /> Back to reports
@@ -148,10 +148,10 @@ function ReportDetail() {
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Button variant="outline" onClick={downloadPdf}>
+          <Button variant="outline" className="flex-1 sm:flex-none" onClick={downloadPdf}>
             <Download className="size-4" /> Download PDF
           </Button>
-          <Button onClick={() => window.print()}>
+          <Button className="flex-1 sm:flex-none" onClick={() => window.print()}>
             <Printer className="size-4" /> Print report
           </Button>
         </div>
@@ -159,7 +159,7 @@ function ReportDetail() {
 
       <Card className="shadow-soft print:shadow-none print:border-none">
         <CardContent className="p-0">
-          <div className="bg-primary text-primary-foreground px-8 py-7 print:bg-primary print:text-primary-foreground">
+          <div className="bg-primary text-primary-foreground px-4 py-5 print:bg-primary print:text-primary-foreground sm:px-8 sm:py-7">
             <div className="flex flex-wrap items-center justify-between gap-4">
               <div>
                 <p className="text-xs font-medium tracking-wide uppercase opacity-80">
@@ -174,7 +174,7 @@ function ReportDetail() {
             </div>
           </div>
 
-          <div className="space-y-8 px-8 py-7">
+          <div className="space-y-6 px-4 py-5 sm:px-8 sm:py-7">
             <section>
               <h3 className="border-b-2 border-accent pb-1 text-xs font-semibold tracking-widest text-foreground uppercase">
                 Student information
