@@ -165,8 +165,18 @@
     background-color: var(--color-background);
     color: var(--color-foreground);
     line-height: 1.6;
-    overflow-wrap: anywhere;
-    word-break: break-word;
+    overflow-wrap: break-word;
+    word-break: normal;
+  }
+
+  table {
+    border-collapse: collapse;
+  }
+
+  th,
+  td {
+    overflow-wrap: normal;
+    word-break: normal;
   }
 
   img,
