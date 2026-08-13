@@ -23,7 +23,7 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { api, qk } from "@/lib/api";
-import { LEVELS, PROGRAMS, STUDENT_STATUSES, todayISO } from "@/lib/domain";
+import { LEVELS, STUDENT_STATUSES, todayISO } from "@/lib/domain";
 import type { Student } from "@/lib/domain";
 
 const schema = z.object({
@@ -70,7 +70,7 @@ const empty: FormValues = {
   phone: "",
   email: "",
   address: "",
-  program: PROGRAMS[0],
+  program: "",
   current_level: "A1",
   target_level: "B1",
   enrollment_date: todayISO(),
@@ -79,7 +79,6 @@ const empty: FormValues = {
   photo: "",
   notes: "",
 };
-
 
 export function StudentFormDialog({
   open,
@@ -120,8 +119,7 @@ export function StudentFormDialog({
     );
   }, [open, student]);
 
-  const set = (key: keyof FormValues, value: string) =>
-    setValues((v) => ({ ...v, [key]: value }));
+  const set = (key: keyof FormValues, value: string) => setValues((v) => ({ ...v, [key]: value }));
 
   const mutation = useMutation({
     mutationFn: async (payload: FormValues) => {
@@ -201,7 +199,7 @@ export function StudentFormDialog({
           {field("date_of_birth", "Date of Birth", "date")}
           {field("phone", "Phone Number")}
           {field("email", "Email")}
-          {selectField("program", "Program *", PROGRAMS)}
+          {field("program", "Program *")}
           {selectField("current_level", "Current Level *", LEVELS)}
           {selectField("target_level", "Target Level", LEVELS)}
           {field("enrollment_date", "Enrollment Date *", "date")}
