@@ -37,12 +37,13 @@ import {
 import { api, qk } from "@/lib/api";
 import {
   MONTHS,
+  assessmentScoreKey,
   effectiveAssignmentStatus,
   effectiveProjectStatus,
   formatDate,
   summarizeAttendance,
 } from "@/lib/domain";
-import type { MonthlyReport } from "@/lib/domain";
+import type { AssessmentSkill, MonthlyAssessment, MonthlyReport } from "@/lib/domain";
 import { skillsFromProgress } from "@/lib/pdf";
 
 export const Route = createFileRoute("/_authenticated/reports/")({
@@ -95,7 +96,17 @@ function ReportsPage() {
   const generate = useMutation({
     mutationFn: async () => {
       if (!studentId) throw new Error("Select a student first.");
-      const ym = `${year}-${String(Number(month)).padStart(2, "0")}`;
+      const y = Number(year);
+      const m = Number(month);
+      if (!Number.isInteger(y) || y < 2000 || y > 2100)
+        throw new Error("Please enter a valid year (2000–2100).");
+      if (
+        (reports.data ?? []).some(
+          (r) => r.student_id === studentId && r.month === m && r.year === y,
+        )
+      )
+        throw new Error("A report for this student and month already exists.");
+      const ym = `${y}-${String(m).padStart(2, "0")}`;
       const attRecords = (attendance.data ?? []).filter(
         (r) => r.student_id === studentId && r.date.startsWith(ym),
       );
@@ -175,10 +186,28 @@ function ReportsPage() {
         : null;
       const projCompletionPercent = projTotal ? Math.round((projCompleted / projTotal) * 100) : 0;
 
+      // Skill Assessment: pull every scored lesson in this month for this
+      // student and pre-fill the "Monthly Total" with the plain sum.
+      // Final scores and percentages are left null — the teacher decides
+      // those manually (never auto-computed).
+      const sumFor = (skill: AssessmentSkill): number | null => {
+        const scored = lessonsInMonth.filter((l) => l[assessmentScoreKey(skill)] != null);
+        if (!scored.length) return null;
+        return scored.reduce((acc, l) => acc + (l[assessmentScoreKey(skill)] as number), 0);
+      };
+      const monthlyAssessment: MonthlyAssessment = {
+        speaking: { total: sumFor("speaking"), final_score: null, percentage: null },
+        listening: { total: sumFor("listening"), final_score: null, percentage: null },
+        reading: { total: sumFor("reading"), final_score: null, percentage: null },
+        writing: { total: sumFor("writing"), final_score: null, percentage: null },
+        vocabulary: { total: sumFor("vocabulary"), final_score: null, percentage: null },
+        overall: { monthly_score: null, percentage: null },
+      };
+
       return api.saveReport({
         student_id: studentId,
-        month: Number(month),
-        year: Number(year),
+        month: m,
+        year: y,
         total_meetings: att.total,
         present: att.present,
         late: att.late,
@@ -207,6 +236,7 @@ function ReportsPage() {
         projects_completion_percent: projCompletionPercent,
         overall_progress: prog?.overall_progress ?? 0,
         skills,
+        monthly_assessment: monthlyAssessment,
         level: student?.current_level ?? null,
         teacher_evaluation: evaluation.trim() || null,
         recommendations: recommendations.trim() || null,
@@ -290,6 +320,8 @@ function ReportsPage() {
               <Input
                 id="year"
                 type="number"
+                min={2000}
+                max={2100}
                 value={year}
                 onChange={(e) => setYear(e.target.value)}
               />

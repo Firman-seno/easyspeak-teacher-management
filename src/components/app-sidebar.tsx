@@ -41,7 +41,7 @@ const items = [
 ] as const;
 
 export function AppSidebar() {
-  const { state } = useSidebar();
+  const { state, isMobile, setOpenMobile } = useSidebar();
   const collapsed = state === "collapsed";
   const pathname = useRouterState({ select: (r) => r.location.pathname });
 
@@ -55,9 +55,7 @@ export function AppSidebar() {
           {!collapsed && (
             <div className="min-w-0">
               <p className="truncate text-sm font-semibold text-sidebar-foreground">EasySpeak</p>
-              <p className="truncate text-[11px] text-sidebar-foreground/60">
-                Teacher Management
-              </p>
+              <p className="truncate text-[11px] text-sidebar-foreground/60">Teacher Management</p>
             </div>
           )}
         </div>
@@ -74,7 +72,11 @@ export function AppSidebar() {
                     tooltip={item.title}
                     isActive={pathname === item.url || pathname.startsWith(item.url + "/")}
                   >
-                    <Link to={item.url} className="flex items-center gap-3">
+                    <Link
+                      to={item.url}
+                      className="flex items-center gap-3"
+                      onClick={isMobile ? () => setOpenMobile(false) : undefined}
+                    >
                       <item.icon className="size-4 shrink-0" />
                       <span className="truncate">{item.title}</span>
                     </Link>

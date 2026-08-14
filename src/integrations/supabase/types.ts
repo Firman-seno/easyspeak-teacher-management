@@ -129,6 +129,7 @@ export type Database = {
       }
       lessons: {
         Row: {
+          assessment_notes: string | null
           attachment: string | null
           content: string | null
           created_at: string
@@ -138,10 +139,13 @@ export type Database = {
           homework: string | null
           id: string
           level: string | null
+          listening_score: number | null
           notes: string | null
           objective: string | null
           program: string | null
+          reading_score: number | null
           speaking_practice: string | null
+          speaking_score: number | null
           status: string
           student_id: string | null
           subtitle: string | null
@@ -151,8 +155,11 @@ export type Database = {
           unit: string | null
           updated_at: string
           vocabulary: string | null
+          vocabulary_score: number | null
+          writing_score: number | null
         }
         Insert: {
+          assessment_notes?: string | null
           attachment?: string | null
           content?: string | null
           created_at?: string
@@ -162,10 +169,13 @@ export type Database = {
           homework?: string | null
           id?: string
           level?: string | null
+          listening_score?: number | null
           notes?: string | null
           objective?: string | null
           program?: string | null
+          reading_score?: number | null
           speaking_practice?: string | null
+          speaking_score?: number | null
           status?: string
           student_id?: string | null
           subtitle?: string | null
@@ -175,8 +185,11 @@ export type Database = {
           unit?: string | null
           updated_at?: string
           vocabulary?: string | null
+          vocabulary_score?: number | null
+          writing_score?: number | null
         }
         Update: {
+          assessment_notes?: string | null
           attachment?: string | null
           content?: string | null
           created_at?: string
@@ -186,10 +199,13 @@ export type Database = {
           homework?: string | null
           id?: string
           level?: string | null
+          listening_score?: number | null
           notes?: string | null
           objective?: string | null
           program?: string | null
+          reading_score?: number | null
           speaking_practice?: string | null
+          speaking_score?: number | null
           status?: string
           student_id?: string | null
           subtitle?: string | null
@@ -199,6 +215,8 @@ export type Database = {
           unit?: string | null
           updated_at?: string
           vocabulary?: string | null
+          vocabulary_score?: number | null
+          writing_score?: number | null
         }
         Relationships: [
           {
@@ -257,6 +275,7 @@ export type Database = {
           lessons_total: number
           level: string | null
           month: number
+          monthly_assessment: Json | null
           next_month_goals: string | null
           overall_progress: number
           present: number
@@ -298,6 +317,7 @@ export type Database = {
           lessons_total?: number
           level?: string | null
           month: number
+          monthly_assessment?: Json | null
           next_month_goals?: string | null
           overall_progress?: number
           present?: number
@@ -339,6 +359,7 @@ export type Database = {
           lessons_total?: number
           level?: string | null
           month?: number
+          monthly_assessment?: Json | null
           next_month_goals?: string | null
           overall_progress?: number
           present?: number

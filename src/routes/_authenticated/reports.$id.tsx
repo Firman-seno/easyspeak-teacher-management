@@ -1,21 +1,48 @@
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { ArrowLeft, Download, Printer } from "lucide-react";
-import { useEffect, useMemo } from "react";
+import { ArrowLeft, Download, Printer, Save } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { toast } from "sonner";
 import { z } from "zod";
 
 import { EmptyState, ProgressBar } from "@/components/kit";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import {
   useAssignments,
   useLessons,
-  useProgress,
   useProjects,
   useReports,
   useSettings,
   useStudents,
 } from "@/hooks/use-data";
-import { MONTHS, SKILLS as skillList, formatDate } from "@/lib/domain";
+import { api, qk } from "@/lib/api";
+import {
+  ASSESSMENT_SKILLS,
+  MONTHS,
+  assessmentScoreKey,
+  effectiveAssignmentStatus,
+  effectiveProjectStatus,
+  formatDate,
+  parseMonthlyAssessment,
+} from "@/lib/domain";
+import type {
+  AssessmentSkill,
+  Lesson,
+  MonthlyAssessment,
+  MonthlyReport,
+  SkillAssessmentValue,
+} from "@/lib/domain";
 import { buildReportPdf } from "@/lib/pdf";
 
 const reportSearch = z.object({
@@ -39,6 +66,314 @@ export const Route = createFileRoute("/_authenticated/reports/$id")({
   component: ReportDetail,
 });
 
+const ASSESSMENT_LABELS: Record<AssessmentSkill, string> = {
+  speaking: "Speaking",
+  listening: "Listening",
+  reading: "Reading",
+  writing: "Writing",
+  vocabulary: "Vocabulary",
+};
+
+type SkillDraft = { total: string; finalScore: string; percentage: string };
+type AssessmentDraft = Record<AssessmentSkill, SkillDraft> & {
+  overallScore: string;
+  overallPercentage: string;
+};
+
+function toNumberOrNull(value: string): number | null {
+  const t = value.trim();
+  if (t === "") return null;
+  const n = Number(t);
+  return Number.isFinite(n) ? n : null;
+}
+
+function validScore(value: string, allowAnyPositive = false): boolean {
+  const t = value.trim();
+  if (t === "") return true;
+  if (!/^\d+$/.test(t)) return false;
+  const n = Number(t);
+  if (!Number.isInteger(n)) return false;
+  return allowAnyPositive ? n >= 0 : n >= 0 && n <= 100;
+}
+
+function initDraft(report: MonthlyReport, lessons: Lesson[]): AssessmentDraft {
+  const stored = parseMonthlyAssessment(report.monthly_assessment);
+  const draft: Partial<Record<AssessmentSkill, SkillDraft>> = {};
+  for (const skill of ASSESSMENT_SKILLS) {
+    const scored = lessons.filter((l) => l[assessmentScoreKey(skill)] != null);
+    const sum = scored.reduce((acc, l) => acc + (l[assessmentScoreKey(skill)] as number), 0);
+    draft[skill] = {
+      total:
+        stored?.[skill].total != null
+          ? String(stored[skill].total)
+          : scored.length
+            ? String(sum)
+            : "",
+      finalScore: stored?.[skill].final_score != null ? String(stored[skill].final_score) : "",
+      percentage: stored?.[skill].percentage != null ? String(stored[skill].percentage) : "",
+    };
+  }
+  return {
+    ...(draft as Record<AssessmentSkill, SkillDraft>),
+    overallScore: stored?.overall.monthly_score != null ? String(stored.overall.monthly_score) : "",
+    overallPercentage: stored?.overall.percentage != null ? String(stored.overall.percentage) : "",
+  };
+}
+
+function draftToJson(draft: AssessmentDraft): MonthlyAssessment {
+  const row = (d: SkillDraft): SkillAssessmentValue => ({
+    total: toNumberOrNull(d.total),
+    final_score: toNumberOrNull(d.finalScore),
+    percentage: toNumberOrNull(d.percentage),
+  });
+  return {
+    speaking: row(draft.speaking),
+    listening: row(draft.listening),
+    reading: row(draft.reading),
+    writing: row(draft.writing),
+    vocabulary: row(draft.vocabulary),
+    overall: {
+      monthly_score: toNumberOrNull(draft.overallScore),
+      percentage: toNumberOrNull(draft.overallPercentage),
+    },
+  };
+}
+
+function skillScoreRows(lessons: Lesson[], skill: AssessmentSkill) {
+  return lessons
+    .map((l) => ({ id: l.id, date: l.date, title: l.title, score: l[assessmentScoreKey(skill)] }))
+    .filter((r) => r.score != null)
+    .sort((a, b) => a.date.localeCompare(b.date));
+}
+
+function EditableField({
+  label,
+  value,
+  onChange,
+  suffix,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  suffix?: string;
+}) {
+  return (
+    <div className="space-y-1">
+      {label ? (
+        <Label className="text-[11px] font-medium text-muted-foreground">{label}</Label>
+      ) : null}
+      <div className="flex items-center gap-1">
+        <Input
+          type="number"
+          inputMode="numeric"
+          min={0}
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          className="h-8 w-full min-w-0 print:hidden"
+        />
+        <span className="hidden shrink-0 text-sm font-medium text-foreground print:inline">
+          {value.trim() ? value : "—"}
+          {suffix ?? ""}
+        </span>
+      </div>
+    </div>
+  );
+}
+
+function AssessmentEditor({ report, lessons }: { report: MonthlyReport; lessons: Lesson[] }) {
+  const qc = useQueryClient();
+  const [draft, setDraft] = useState<AssessmentDraft>(() => initDraft(report, lessons));
+
+  const setRow = (skill: AssessmentSkill, key: keyof SkillDraft, value: string) =>
+    setDraft((d) => ({ ...d, [skill]: { ...d[skill], [key]: value } }));
+
+  const save = useMutation({
+    mutationFn: () => {
+      for (const skill of ASSESSMENT_SKILLS) {
+        if (!validScore(draft[skill].total, true))
+          throw new Error(
+            `${ASSESSMENT_LABELS[skill]} monthly total must be a number of 0 or more.`,
+          );
+        if (!validScore(draft[skill].finalScore))
+          throw new Error(`${ASSESSMENT_LABELS[skill]} final score must be between 0 and 100.`);
+        if (!validScore(draft[skill].percentage))
+          throw new Error(`${ASSESSMENT_LABELS[skill]} percentage must be between 0 and 100.`);
+      }
+      if (!validScore(draft.overallScore, true))
+        throw new Error("Overall monthly score must be a number of 0 or more.");
+      if (!validScore(draft.overallPercentage))
+        throw new Error("Overall percentage must be between 0 and 100.");
+      return api.updateReport(report.id, { monthly_assessment: draftToJson(draft) });
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: qk.reports });
+      toast.success("Monthly assessment saved.");
+    },
+    onError: (e: Error) => toast.error(e.message || "Something went wrong."),
+  });
+
+  return (
+    <section>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h3 className="border-b-2 border-accent pb-1 text-xs font-semibold tracking-widest text-foreground uppercase">
+          Monthly Assessment
+        </h3>
+        <Button
+          size="sm"
+          onClick={() => save.mutate()}
+          disabled={save.isPending}
+          className="print:hidden"
+        >
+          <Save className="size-4" /> {save.isPending ? "Saving…" : "Save assessment"}
+        </Button>
+      </div>
+
+      <div className="mt-4 grid gap-4 lg:grid-cols-2">
+        {ASSESSMENT_SKILLS.map((skill) => {
+          const rows = skillScoreRows(lessons, skill);
+          return (
+            <div key={skill} className="rounded-xl border border-border bg-muted/20 p-4">
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-sm font-semibold tracking-wide text-foreground uppercase">
+                  {ASSESSMENT_LABELS[skill]}
+                </p>
+                <span className="rounded-full bg-accent/15 px-2.5 py-0.5 text-xs font-medium text-accent-foreground">
+                  {rows.length} assessed
+                </span>
+              </div>
+
+              {rows.length === 0 ? (
+                <p className="mt-3 text-sm text-muted-foreground">Not Assessed</p>
+              ) : (
+                <div className="mt-3 overflow-x-auto rounded-lg border border-border bg-card">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="h-8">Date</TableHead>
+                        <TableHead className="h-8">Lesson</TableHead>
+                        <TableHead className="h-8 text-right">Score</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {rows.map((r) => (
+                        <TableRow key={r.id}>
+                          <TableCell className="text-xs whitespace-nowrap">
+                            {formatDate(r.date)}
+                          </TableCell>
+                          <TableCell className="text-xs">{r.title}</TableCell>
+                          <TableCell className="text-xs font-medium text-right">
+                            {r.score}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+
+              <div className="mt-3 grid grid-cols-3 gap-2 sm:gap-3">
+                <EditableField
+                  label="Monthly Total"
+                  value={draft[skill].total}
+                  onChange={(v) => setRow(skill, "total", v)}
+                />
+                <EditableField
+                  label="Final Score"
+                  value={draft[skill].finalScore}
+                  onChange={(v) => setRow(skill, "finalScore", v)}
+                />
+                <EditableField
+                  label="Percentage"
+                  value={draft[skill].percentage}
+                  onChange={(v) => setRow(skill, "percentage", v)}
+                  suffix="%"
+                />
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      <div className="mt-6 overflow-hidden rounded-xl border border-border">
+        <div className="border-b border-border bg-muted/30 px-4 py-3">
+          <h4 className="text-xs font-semibold tracking-widest text-foreground uppercase">
+            Monthly Assessment Summary
+          </h4>
+        </div>
+        <div className="overflow-x-auto">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Skill</TableHead>
+                <TableHead>Lessons Assessed</TableHead>
+                <TableHead>Total Score</TableHead>
+                <TableHead>Final Score</TableHead>
+                <TableHead>Percentage</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {ASSESSMENT_SKILLS.map((skill) => {
+                const rows = skillScoreRows(lessons, skill);
+                return (
+                  <TableRow key={skill}>
+                    <TableCell className="font-medium">{ASSESSMENT_LABELS[skill]}</TableCell>
+                    <TableCell className="whitespace-nowrap">{rows.length || "—"}</TableCell>
+                    <TableCell>
+                      <EditableField
+                        label=""
+                        value={draft[skill].total}
+                        onChange={(v) => setRow(skill, "total", v)}
+                      />
+                    </TableCell>
+                    <TableCell>
+                      <EditableField
+                        label=""
+                        value={draft[skill].finalScore}
+                        onChange={(v) => setRow(skill, "finalScore", v)}
+                      />
+                    </TableCell>
+                    <TableCell>
+                      <EditableField
+                        label=""
+                        value={draft[skill].percentage}
+                        onChange={(v) => setRow(skill, "percentage", v)}
+                        suffix="%"
+                      />
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
+            </TableBody>
+          </Table>
+        </div>
+      </div>
+
+      <div className="mt-6 rounded-xl border border-border bg-muted/20 p-4">
+        <h4 className="text-xs font-semibold tracking-widest text-foreground uppercase">
+          Overall Progress
+        </h4>
+        <p className="mt-1 text-xs text-muted-foreground">
+          Set the overall monthly score and percentage manually based on the student&apos;s progress
+          this month.
+        </p>
+        <div className="mt-3 grid max-w-md grid-cols-2 gap-3">
+          <EditableField
+            label="Overall Monthly Score"
+            value={draft.overallScore}
+            onChange={(v) => setDraft((d) => ({ ...d, overallScore: v }))}
+          />
+          <EditableField
+            label="Overall Percentage"
+            value={draft.overallPercentage}
+            onChange={(v) => setDraft((d) => ({ ...d, overallPercentage: v }))}
+            suffix="%"
+          />
+        </div>
+      </div>
+    </section>
+  );
+}
+
 function ReportDetail() {
   const { id } = Route.useParams();
   const { print } = Route.useSearch();
@@ -48,7 +383,6 @@ function ReportDetail() {
   const lessons = useLessons();
   const assignments = useAssignments();
   const projects = useProjects();
-  const progress = useProgress();
 
   const report = useMemo(() => (reports.data ?? []).find((r) => r.id === id), [reports.data, id]);
 
@@ -86,18 +420,36 @@ function ReportDetail() {
     [projects.data, report, period],
   );
 
-  const prog = useMemo(
-    () => (progress.data ?? []).find((p) => p.student_id === report?.student_id),
-    [progress.data, report],
-  );
-
   useEffect(() => {
     if (!print || !report || !student) return;
     const t = setTimeout(() => window.print(), 350);
     return () => clearTimeout(t);
   }, [print, report, student]);
 
-  if (reports.isLoading || students.isLoading) {
+  const completedAssignments = useMemo(
+    () =>
+      periodAssignments.filter(
+        (a) => effectiveAssignmentStatus(a.status, a.due_date) === "Completed",
+      ),
+    [periodAssignments],
+  );
+
+  const completedProjects = useMemo(
+    () =>
+      periodProjects.filter((p) => effectiveProjectStatus(p.status, p.due_date) === "Completed"),
+    [periodProjects],
+  );
+
+  const assessment = useMemo(
+    () => parseMonthlyAssessment(report?.monthly_assessment ?? null),
+    [report?.monthly_assessment],
+  );
+  const legacySkills = useMemo(
+    () => (report?.skills ?? {}) as Record<string, number>,
+    [report?.skills],
+  );
+
+  if (reports.isLoading || students.isLoading || lessons.isLoading) {
     return <p className="text-sm text-muted-foreground">Loading report…</p>;
   }
 
@@ -115,10 +467,17 @@ function ReportDetail() {
     );
   }
 
-  const skills = (report.skills ?? {}) as Record<string, number>;
   const periodLabel = `${MONTHS[report.month - 1]} ${report.year}`;
   const schoolName = settings.data?.school_name ?? "EasySpeak Language School";
   const teacherName = settings.data?.teacher_name ?? "Teacher";
+
+  const skillPercent = (skill: AssessmentSkill): number | null => {
+    if (assessment) return assessment[skill].percentage;
+    const v = legacySkills[skill];
+    return typeof v === "number" ? v : null;
+  };
+
+  const overallPercent = assessment ? assessment.overall.percentage : report.overall_progress;
 
   const downloadPdf = () => {
     const doc = buildReportPdf({
@@ -130,7 +489,9 @@ function ReportDetail() {
       schoolName,
       teacherName,
     });
-    doc.save(`monthly-report-${student.name}-${periodLabel.replace(" ", "-")}.pdf`);
+    doc.save(
+      `monthly-report-${student.name.replace(/[^\w\s-]/g, "").replace(/\s+/g, "-")}-${periodLabel.replace(" ", "-")}.pdf`,
+    );
   };
 
   return (
@@ -317,24 +678,37 @@ function ReportDetail() {
                 Skill analysis
               </h3>
               <div className="mt-4 grid gap-x-8 gap-y-4 sm:grid-cols-2">
-                {skillList.map((skill) => (
-                  <div key={skill}>
-                    <div className="mb-1 flex items-center justify-between text-sm">
-                      <span className="capitalize text-foreground">{skill}</span>
-                      <span className="font-medium text-foreground">{skills[skill] ?? 0}%</span>
+                {ASSESSMENT_SKILLS.map((skill) => {
+                  const pct = skillPercent(skill);
+                  return (
+                    <div key={skill}>
+                      <div className="mb-1 flex items-center justify-between text-sm">
+                        <span className="capitalize text-foreground">{skill}</span>
+                        {pct != null ? (
+                          <span className="font-medium text-foreground">{pct}%</span>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">Not Assessed</span>
+                        )}
+                      </div>
+                      {pct != null && <ProgressBar value={pct} />}
                     </div>
-                    <ProgressBar value={skills[skill] ?? 0} />
-                  </div>
-                ))}
+                  );
+                })}
                 <div className="sm:col-span-2">
                   <div className="mb-1 flex items-center justify-between text-sm">
                     <span className="font-medium text-foreground">Overall progress</span>
-                    <span className="font-medium text-foreground">{report.overall_progress}%</span>
+                    {overallPercent != null ? (
+                      <span className="font-medium text-foreground">{overallPercent}%</span>
+                    ) : (
+                      <span className="text-xs text-muted-foreground">Not Assessed</span>
+                    )}
                   </div>
-                  <ProgressBar value={report.overall_progress} tone="success" />
+                  {overallPercent != null && <ProgressBar value={overallPercent} tone="success" />}
                 </div>
               </div>
             </section>
+
+            <AssessmentEditor key={report.id} report={report} lessons={periodLessons} />
 
             {periodLessons.length > 0 && (
               <section>
@@ -364,13 +738,13 @@ function ReportDetail() {
               </section>
             )}
 
-            {periodAssignments.length > 0 && (
+            {completedAssignments.length > 0 && (
               <section>
                 <h3 className="border-b-2 border-accent pb-1 text-xs font-semibold tracking-widest text-foreground uppercase">
                   Assignments completed
                 </h3>
                 <div className="mt-4 space-y-2">
-                  {periodAssignments.map((a) => (
+                  {completedAssignments.map((a) => (
                     <div
                       key={a.id}
                       className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border bg-muted/30 px-4 py-2.5 text-sm"
@@ -397,13 +771,13 @@ function ReportDetail() {
               </section>
             )}
 
-            {periodProjects.length > 0 && (
+            {completedProjects.length > 0 && (
               <section>
                 <h3 className="border-b-2 border-accent pb-1 text-xs font-semibold tracking-widest text-foreground uppercase">
                   Projects completed
                 </h3>
                 <div className="mt-4 space-y-2">
-                  {periodProjects.map((p) => (
+                  {completedProjects.map((p) => (
                     <div
                       key={p.id}
                       className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border bg-muted/30 px-4 py-2.5 text-sm"
@@ -412,7 +786,7 @@ function ReportDetail() {
                         <p className="truncate font-medium text-foreground">{p.title}</p>
                         <p className="truncate text-xs text-muted-foreground">
                           {p.type}
-                          {prog ? ` • Level ${p.level ?? "—"}` : ""}
+                          {p.level ? ` • Level ${p.level}` : ""}
                         </p>
                       </div>
                       <div className="flex shrink-0 items-center gap-4">

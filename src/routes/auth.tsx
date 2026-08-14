@@ -54,8 +54,12 @@ function AuthPage() {
       toast.error("Email and password are required.");
       return;
     }
+    if (mode === "signup" && password.length < 8) {
+      toast.error("Password must be at least 8 characters.");
+      return;
+    }
     setLoading(true);
-    const { error } =
+    const result =
       mode === "signin"
         ? await supabase.auth.signInWithPassword({ email, password })
         : await supabase.auth.signUp({
@@ -64,16 +68,20 @@ function AuthPage() {
             options: { emailRedirectTo: window.location.origin },
           });
     setLoading(false);
-    if (error) {
+    if (result.error) {
       if (
         mode === "signin" &&
-        (error.message.includes("Invalid login credentials") ||
-          error.message.toLowerCase().includes("invalid email"))
+        (result.error.message.includes("Invalid login credentials") ||
+          result.error.message.toLowerCase().includes("invalid email"))
       ) {
         toast.error("Invalid email or password. Please try again.");
       } else {
-        toast.error(error.message);
+        toast.error(result.error.message);
       }
+      return;
+    }
+    if (mode === "signup" && !result.data.session) {
+      toast.success("Account created. Check your email to confirm your account.");
       return;
     }
     toast.success(mode === "signin" ? "Welcome back." : "Account created.");

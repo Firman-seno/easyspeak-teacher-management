@@ -1,4 +1,4 @@
-import type { Tables } from "@/integrations/supabase/types";
+import type { Json, Tables } from "@/integrations/supabase/types";
 
 export type Student = Tables<"students">;
 export type Attendance = Tables<"attendance">;
@@ -70,6 +70,76 @@ export const SKILLS = [
   "grammar",
 ] as const;
 export type Skill = (typeof SKILLS)[number];
+
+// The 5 skills used by Lessons/Materials assessments and the
+// Monthly Reports Skill Analysis. Grammar is intentionally absent.
+export const ASSESSMENT_SKILLS = [
+  "speaking",
+  "listening",
+  "reading",
+  "writing",
+  "vocabulary",
+] as const;
+export type AssessmentSkill = (typeof ASSESSMENT_SKILLS)[number];
+export type AssessmentScoreKey = `${AssessmentSkill}_score`;
+
+export type SkillAssessmentValue = {
+  total: number | null;
+  final_score: number | null;
+  percentage: number | null;
+};
+
+export type MonthlyAssessment = {
+  speaking: SkillAssessmentValue;
+  listening: SkillAssessmentValue;
+  reading: SkillAssessmentValue;
+  writing: SkillAssessmentValue;
+  vocabulary: SkillAssessmentValue;
+  overall: { monthly_score: number | null; percentage: number | null };
+};
+
+export function assessmentScoreKey(skill: AssessmentSkill): AssessmentScoreKey {
+  return `${skill}_score`;
+}
+
+function numberOrNull(value: unknown): number | null {
+  return typeof value === "number" ? value : null;
+}
+
+// Reads the manual monthly assessment JSON stored on monthly_reports.
+// Returns null for legacy reports that predate the Skill Assessment feature.
+export function parseMonthlyAssessment(value: Json | null): MonthlyAssessment | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const v = value as Record<string, unknown>;
+  const pick = (key: string): SkillAssessmentValue => {
+    const s = v[key];
+    if (!s || typeof s !== "object" || Array.isArray(s)) {
+      return { total: null, final_score: null, percentage: null };
+    }
+    const r = s as Record<string, unknown>;
+    return {
+      total: numberOrNull(r["total"]),
+      final_score: numberOrNull(r["final_score"]),
+      percentage: numberOrNull(r["percentage"]),
+    };
+  };
+  const overall = v["overall"];
+  const o =
+    overall && typeof overall === "object" && !Array.isArray(overall)
+      ? (overall as Record<string, unknown>)
+      : undefined;
+  return {
+    speaking: pick("speaking"),
+    listening: pick("listening"),
+    reading: pick("reading"),
+    writing: pick("writing"),
+    vocabulary: pick("vocabulary"),
+    overall: {
+      monthly_score: o ? numberOrNull(o["monthly_score"]) : null,
+      percentage: o ? numberOrNull(o["percentage"]) : null,
+    },
+  };
+}
 
 export const MONTHS = [
   "January",
@@ -168,11 +238,7 @@ export function todayISO() {
 }
 
 export function effectiveAssignmentStatus(status: string, dueDate?: string | null): string {
-  if (
-    (status === "Assigned" || status === "In Progress") &&
-    dueDate &&
-    dueDate < todayISO()
-  ) {
+  if ((status === "Assigned" || status === "In Progress") && dueDate && dueDate < todayISO()) {
     return "Overdue";
   }
   return status;

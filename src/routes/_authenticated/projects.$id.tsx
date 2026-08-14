@@ -1,5 +1,5 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { ArrowLeft, FolderKanban, Pencil, Trash2 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
@@ -30,6 +30,7 @@ export const Route = createFileRoute("/_authenticated/projects/$id")({
 function ProjectDetail() {
   const { id } = Route.useParams();
   const qc = useQueryClient();
+  const navigate = useNavigate();
   const projects = useProjects();
   const students = useStudents();
   const lessons = useLessons();
@@ -58,6 +59,7 @@ function ProjectDetail() {
       qc.invalidateQueries({ queryKey: qk.projects });
       toast.success("Project successfully deleted.");
       setConfirmOpen(false);
+      navigate({ to: "/projects" });
     },
     onError: () => toast.error("Something went wrong."),
   });
@@ -155,7 +157,13 @@ function ProjectDetail() {
           </div>
           <ProgressBar
             value={project.progress}
-            tone={statusValue === "Completed" ? "success" : statusValue === "Overdue" ? "danger" : "secondary"}
+            tone={
+              statusValue === "Completed"
+                ? "success"
+                : statusValue === "Overdue"
+                  ? "danger"
+                  : "secondary"
+            }
           />
         </CardContent>
       </Card>

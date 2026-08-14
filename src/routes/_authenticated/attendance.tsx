@@ -203,25 +203,13 @@ function AttendancePage() {
         <div className="grid gap-3 sm:grid-cols-[1fr_180px_130px_1fr_auto] sm:items-end sm:gap-3">
           <div className="space-y-1.5">
             <Label htmlFor="student">Student *</Label>
-            <Select value={selectedStudent} onValueChange={setSelectedStudent}>
-              <SelectTrigger id="student">
-                <SelectValue placeholder="Select student..." />
-              </SelectTrigger>
-              <SelectContent>
-                {availableStudents.length === 0 ? (
-                  <SelectItem value="empty" disabled>
-                    No active students
-                  </SelectItem>
-                ) : (
-                  availableStudents.map((s) => (
-                    <SelectItem key={s.id} value={s.id}>
-                      <span className="min-w-0 truncate whitespace-nowrap">{s.name}</span>
-                      <span className="text-xs text-muted-foreground">({s.student_id})</span>
-                    </SelectItem>
-                  ))
-                )}
-              </SelectContent>
-            </Select>
+            <StudentCombobox
+              students={availableStudents}
+              value={selectedStudent}
+              onChange={(id) => setSelectedStudent(id)}
+              triggerPlaceholder="Search or select student..."
+              searchPlaceholder="Search student..."
+            />
           </div>
 
           <div className="space-y-1.5">

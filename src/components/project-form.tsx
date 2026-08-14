@@ -111,7 +111,10 @@ export function ProjectFormDialog({
         startDate: project.assigned_date.slice(0, 10),
         dueDate: project.due_date?.slice(0, 10) ?? "",
         status: project.status,
-        progress: project.progress === null || project.progress === undefined ? "" : String(project.progress),
+        progress:
+          project.progress === null || project.progress === undefined
+            ? ""
+            : String(project.progress),
         submissionDate: project.submission_date?.slice(0, 10) ?? "",
         score: project.score === null || project.score === undefined ? "" : String(project.score),
         teacherFeedback: project.feedback ?? "",
@@ -132,8 +135,7 @@ export function ProjectFormDialog({
     [lessons, values.studentId],
   );
 
-  const set = (key: keyof FormValues, value: string) =>
-    setValues((v) => ({ ...v, [key]: value }));
+  const set = (key: keyof FormValues, value: string) => setValues((v) => ({ ...v, [key]: value }));
 
   const mutation = useMutation({
     mutationFn: async (payload: FormValues) => {
@@ -277,12 +279,8 @@ export function ProjectFormDialog({
           {field("submissionDate", "Submission Date", "date")}
           {field("score", "Score (0–100)", "number")}
 
-          <div className="sm:col-span-2">
-            {textareaField("description", "Description", 3)}
-          </div>
-          <div className="sm:col-span-2">
-            {textareaField("objective", "Objective", 3)}
-          </div>
+          <div className="sm:col-span-2">{textareaField("description", "Description", 3)}</div>
+          <div className="sm:col-span-2">{textareaField("objective", "Objective", 3)}</div>
 
           {field("attachment", "Attachment / File (URL)")}
           {field("submissionLink", "Submission Link (URL)")}
@@ -290,9 +288,7 @@ export function ProjectFormDialog({
           <div className="sm:col-span-2">
             {textareaField("teacherFeedback", "Teacher Feedback", 4)}
           </div>
-          <div className="sm:col-span-2">
-            {textareaField("teacherNotes", "Teacher Notes", 3)}
-          </div>
+          <div className="sm:col-span-2">{textareaField("teacherNotes", "Teacher Notes", 3)}</div>
         </div>
 
         <DialogFooter>

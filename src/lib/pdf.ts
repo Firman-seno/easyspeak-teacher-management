@@ -1,7 +1,15 @@
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 
-import { MONTHS, SKILLS, formatDate } from "./domain";
+import {
+  ASSESSMENT_SKILLS,
+  MONTHS,
+  SKILLS,
+  effectiveAssignmentStatus,
+  effectiveProjectStatus,
+  formatDate,
+  parseMonthlyAssessment,
+} from "./domain";
 import type { Assignment, Lesson, MonthlyReport, Project, Student } from "./domain";
 
 const NAVY: [number, number, number] = [23, 37, 66];
@@ -145,31 +153,69 @@ export function buildReportPdf({
     ],
   );
 
-  const skills = (report.skills ?? {}) as Record<string, number>;
+  const assessment = parseMonthlyAssessment(report.monthly_assessment);
+  const legacySkills = (report.skills ?? {}) as Record<string, number>;
+  const skillPercent = (skill: string): number | null => {
+    if (assessment) {
+      const v = assessment[skill as keyof typeof assessment];
+      return v && typeof v === "object" && !Array.isArray(v) && typeof v.percentage === "number"
+        ? v.percentage
+        : null;
+    }
+    const legacy = legacySkills[skill];
+    return typeof legacy === "number" ? legacy : null;
+  };
+  const overallPercent = assessment ? assessment.overall.percentage : report.overall_progress;
+
   section("Skill Analysis");
+  const skillRows: (string | number)[][] = [];
+  for (const skill of ASSESSMENT_SKILLS) {
+    const pct = skillPercent(skill);
+    skillRows.push([
+      skill.charAt(0).toUpperCase() + skill.slice(1),
+      pct != null ? `${pct}%` : "Not Assessed",
+    ]);
+  }
   table(
     ["Skill", "Score", "Skill", "Score"],
     [
-      ["Speaking", `${skills["speaking"] ?? 0}%`, "Writing", `${skills["writing"] ?? 0}%`],
-      ["Listening", `${skills["listening"] ?? 0}%`, "Vocabulary", `${skills["vocabulary"] ?? 0}%`],
-      ["Reading", `${skills["reading"] ?? 0}%`, "Grammar", `${skills["grammar"] ?? 0}%`],
-      ["Overall Progress", `${report.overall_progress}%`, "", ""],
+      [
+        skillRows[0]?.[0] ?? "",
+        skillRows[0]?.[1] ?? "",
+        skillRows[1]?.[0] ?? "",
+        skillRows[1]?.[1] ?? "",
+      ],
+      [
+        skillRows[2]?.[0] ?? "",
+        skillRows[2]?.[1] ?? "",
+        skillRows[3]?.[0] ?? "",
+        skillRows[3]?.[1] ?? "",
+      ],
+      [
+        skillRows[4]?.[0] ?? "",
+        skillRows[4]?.[1] ?? "",
+        "Overall Progress",
+        overallPercent != null ? `${overallPercent}%` : "Not Assessed",
+      ],
     ],
   );
 
   if (lessons.length) {
     section("Materials Covered");
     table(
-      ["Date", "Title", "Topic", "Grammar"],
-      lessons.map((l) => [formatDate(l.date), l.title, l.topic ?? "-", l.grammar ?? "-"]),
+      ["Date", "Title", "Topic"],
+      lessons.map((l) => [formatDate(l.date), l.title, l.topic ?? "-"]),
     );
   }
 
-  if (assignments.length) {
+  const completedAssignments = assignments.filter(
+    (a) => effectiveAssignmentStatus(a.status, a.due_date) === "Completed",
+  );
+  if (completedAssignments.length) {
     section("Assignments Completed");
     table(
       ["Title", "Type", "Status", "Score", "Due"],
-      assignments.map((a) => [
+      completedAssignments.map((a) => [
         a.title,
         a.type,
         a.status ?? "-",
@@ -179,11 +225,14 @@ export function buildReportPdf({
     );
   }
 
-  if (projects.length) {
+  const completedProjects = projects.filter(
+    (p) => effectiveProjectStatus(p.status, p.due_date) === "Completed",
+  );
+  if (completedProjects.length) {
     section("Projects Completed");
     table(
       ["Title", "Type", "Score", "Completed"],
-      projects.map((p) => [p.title, p.type, p.score ?? "-", formatDate(p.completed_date)]),
+      completedProjects.map((p) => [p.title, p.type, p.score ?? "-", formatDate(p.completed_date)]),
     );
   }
 

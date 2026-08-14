@@ -35,8 +35,16 @@ import {
 } from "@/components/ui/select";
 import { useLessons, useStudents } from "@/hooks/use-data";
 import { api, qk } from "@/lib/api";
-import { LESSON_STATUSES, LEVELS, PROGRAMS, formatDate } from "@/lib/domain";
-import type { Lesson } from "@/lib/domain";
+import { ASSESSMENT_SKILLS, LESSON_STATUSES, LEVELS, PROGRAMS, formatDate } from "@/lib/domain";
+import type { AssessmentSkill, Lesson } from "@/lib/domain";
+
+const ASSESSMENT_LABELS: Record<AssessmentSkill, string> = {
+  speaking: "Speaking",
+  listening: "Listening",
+  reading: "Reading",
+  writing: "Writing",
+  vocabulary: "Vocabulary",
+};
 
 export const Route = createFileRoute("/_authenticated/lessons/")({
   head: () => ({
@@ -363,6 +371,28 @@ function LessonsPage() {
                       <span className="line-clamp-2">{lesson.success_indicator}</span>
                     </div>
                   )}
+
+                  <div className="rounded-lg bg-muted/60 px-3 py-2">
+                    <p className="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
+                      Skill Assessment
+                    </p>
+                    {ASSESSMENT_SKILLS.every((s) => lesson[`${s}_score`] == null) ? (
+                      <p className="mt-0.5 text-xs text-muted-foreground">No Assessment</p>
+                    ) : (
+                      <div className="mt-0.5 flex flex-wrap gap-x-2.5 gap-y-0.5 text-xs">
+                        {ASSESSMENT_SKILLS.map((skill) => {
+                          const score = lesson[`${skill}_score`];
+                          if (score == null) return null;
+                          return (
+                            <span key={skill} className="font-medium text-foreground">
+                              {ASSESSMENT_LABELS[skill]}{" "}
+                              <span className="text-muted-foreground">{score}</span>
+                            </span>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
 
                   <dl className="mt-auto grid grid-cols-2 gap-2 text-xs">
                     <div className="rounded-lg bg-muted px-2.5 py-2">

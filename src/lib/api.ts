@@ -31,7 +31,11 @@ export const api = {
     const student = unwrap(
       await supabase.from("students").insert(values).select().single(),
     ) as Student;
-    await supabase.from("progress").insert({ student_id: student.id });
+    const { error } = await supabase.from("progress").insert({ student_id: student.id });
+    if (error) {
+      await supabase.from("students").delete().eq("id", student.id);
+      throw new Error(error.message);
+    }
     return student;
   },
 
@@ -84,9 +88,7 @@ export const api = {
     );
   },
   async createAssignment(values: TablesInsert<"assignments">): Promise<Assignment> {
-    return unwrap<Assignment>(
-      await supabase.from("assignments").insert(values).select().single(),
-    );
+    return unwrap<Assignment>(await supabase.from("assignments").insert(values).select().single());
   },
   async updateAssignment(id: string, values: TablesUpdate<"assignments">) {
     const { error } = await supabase.from("assignments").update(values).eq("id", id);
@@ -151,6 +153,10 @@ export const api = {
     return unwrap<MonthlyReport>(
       await supabase.from("monthly_reports").insert(values).select().single(),
     );
+  },
+  async updateReport(id: string, values: TablesUpdate<"monthly_reports">) {
+    const { error } = await supabase.from("monthly_reports").update(values).eq("id", id);
+    if (error) throw new Error(error.message);
   },
   async deleteReport(id: string) {
     const { error } = await supabase.from("monthly_reports").delete().eq("id", id);

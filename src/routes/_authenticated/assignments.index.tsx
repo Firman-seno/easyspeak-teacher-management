@@ -1,14 +1,6 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
-import {
-  ClipboardList,
-  Eye,
-  MoreVertical,
-  Pencil,
-  Plus,
-  Search,
-  Trash2,
-} from "lucide-react";
+import { ClipboardList, Eye, MoreVertical, Pencil, Plus, Search, Trash2 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 
@@ -118,7 +110,10 @@ function AssignmentsPage() {
     if (studentId !== "all") {
       const current = list.find((s) => s.id === studentId);
       if (current) {
-        list.splice(list.findIndex((s) => s.id === studentId), 1);
+        list.splice(
+          list.findIndex((s) => s.id === studentId),
+          1,
+        );
         list.unshift(current);
       }
     }

@@ -61,10 +61,21 @@ const empty: FormValues = {
   attachment: "",
 };
 
-function toNumber(value: string | undefined): number | null {
+function toScore(value: string | undefined, maxValue: string | undefined): number | null {
   if (!value || value.trim() === "") return null;
-  const n = Number(value);
-  return Number.isFinite(n) ? Math.min(100, Math.max(0, Math.round(n))) : null;
+  const n = Math.round(Number(value));
+  if (!Number.isFinite(n)) return null;
+  const max = maxValue ? Math.round(Number(maxValue)) : null;
+  if (max !== null && Number.isFinite(max) && max > 0) {
+    return Math.min(max, Math.max(0, n));
+  }
+  return Math.max(0, n);
+}
+
+function toMaxScore(value: string | undefined): number | null {
+  if (!value || value.trim() === "") return null;
+  const n = Math.round(Number(value));
+  return Number.isFinite(n) && n > 0 ? n : null;
 }
 
 export function AssignmentFormDialog({
@@ -105,7 +116,10 @@ export function AssignmentFormDialog({
         assignedDate: assignment.assigned_date.slice(0, 10),
         dueDate: assignment.due_date?.slice(0, 10) ?? "",
         status: assignment.status,
-        score: assignment.score === null || assignment.score === undefined ? "" : String(assignment.score),
+        score:
+          assignment.score === null || assignment.score === undefined
+            ? ""
+            : String(assignment.score),
         maxScore:
           assignment.max_score === null || assignment.max_score === undefined
             ? ""
@@ -126,8 +140,7 @@ export function AssignmentFormDialog({
     [lessons, values.studentId],
   );
 
-  const set = (key: keyof FormValues, value: string) =>
-    setValues((v) => ({ ...v, [key]: value }));
+  const set = (key: keyof FormValues, value: string) => setValues((v) => ({ ...v, [key]: value }));
 
   const mutation = useMutation({
     mutationFn: async (payload: FormValues) => {
@@ -141,8 +154,8 @@ export function AssignmentFormDialog({
         assigned_date: payload.assignedDate,
         due_date: payload.dueDate || null,
         status: payload.status,
-        score: toNumber(payload.score),
-        max_score: payload.maxScore ? Math.max(0, Math.round(Number(payload.maxScore))) || null : null,
+        score: toScore(payload.score, payload.maxScore),
+        max_score: toMaxScore(payload.maxScore),
         teacher_notes: payload.teacherNotes?.trim() || null,
         attachment: payload.attachment?.trim() || null,
       };
@@ -151,7 +164,9 @@ export function AssignmentFormDialog({
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: qk.assignments });
-      toast.success(assignment ? "Assignment successfully updated." : "Assignment successfully added.");
+      toast.success(
+        assignment ? "Assignment successfully updated." : "Assignment successfully added.",
+      );
       onOpenChange(false);
     },
     onError: (e: Error) => toast.error(e.message || "Something went wrong."),
@@ -265,19 +280,13 @@ export function AssignmentFormDialog({
           {selectField("status", "Status", ASSIGNMENT_STATUSES)}
           {field("attachment", "Attachment / File (URL)")}
 
-          <div className="sm:col-span-2">
-            {textareaField("description", "Description", 3)}
-          </div>
-          <div className="sm:col-span-2">
-            {textareaField("instructions", "Instructions", 4)}
-          </div>
+          <div className="sm:col-span-2">{textareaField("description", "Description", 3)}</div>
+          <div className="sm:col-span-2">{textareaField("instructions", "Instructions", 4)}</div>
 
           {field("score", "Score", "number")}
           {field("maxScore", "Max Score", "number")}
 
-          <div className="sm:col-span-2">
-            {textareaField("teacherNotes", "Teacher Notes", 3)}
-          </div>
+          <div className="sm:col-span-2">{textareaField("teacherNotes", "Teacher Notes", 3)}</div>
         </div>
 
         <DialogFooter>

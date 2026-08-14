@@ -1,5 +1,5 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { ArrowLeft, ClipboardList, Pencil, Trash2 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
@@ -30,6 +30,7 @@ export const Route = createFileRoute("/_authenticated/assignments/$id")({
 function AssignmentDetail() {
   const { id } = Route.useParams();
   const qc = useQueryClient();
+  const navigate = useNavigate();
   const assignments = useAssignments();
   const students = useStudents();
   const lessons = useLessons();
@@ -58,11 +59,13 @@ function AssignmentDetail() {
       qc.invalidateQueries({ queryKey: qk.assignments });
       toast.success("Assignment successfully deleted.");
       setConfirmOpen(false);
+      navigate({ to: "/assignments" });
     },
     onError: () => toast.error("Something went wrong."),
   });
 
-  if (assignments.isLoading) return <p className="text-sm text-muted-foreground">Loading assignment…</p>;
+  if (assignments.isLoading)
+    return <p className="text-sm text-muted-foreground">Loading assignment…</p>;
 
   if (!assignment) {
     return (

@@ -20,12 +20,16 @@ export function StudentCombobox({
   onChange,
   disabled,
   allOption,
+  triggerPlaceholder = "Search student…",
+  searchPlaceholder = "Search student by name…",
 }: {
   students: Student[];
   value: string;
   onChange: (id: string, student: Student | undefined) => void;
   disabled?: boolean;
   allOption?: { label: string; value: string };
+  triggerPlaceholder?: string;
+  searchPlaceholder?: string;
 }) {
   const [open, setOpen] = useState(false);
   const selected = students.find((s) => s.id === value);
@@ -58,7 +62,8 @@ export function StudentCombobox({
             </span>
           ) : (
             <span className="flex items-center gap-2 text-muted-foreground">
-              <UserRound className="size-4 shrink-0" /> Search student…
+              <UserRound className="size-4 shrink-0" />
+              {triggerPlaceholder}
             </span>
           )}
           <ChevronsUpDown className="ml-2 size-4 shrink-0 opacity-50" />
@@ -69,7 +74,7 @@ export function StudentCombobox({
         align="start"
       >
         <Command>
-          <CommandInput placeholder="Search student by name…" />
+          <CommandInput placeholder={searchPlaceholder} />
           <CommandList>
             <CommandEmpty>No student found.</CommandEmpty>
             {allOption ? (

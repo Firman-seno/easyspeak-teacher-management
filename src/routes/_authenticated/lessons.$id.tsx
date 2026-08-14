@@ -1,10 +1,11 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import {
   ArrowLeft,
   BookOpen,
   CalendarDays,
   CheckCircle2,
+  ClipboardCheck,
   GraduationCap,
   Link2,
   Pencil,
@@ -20,7 +21,16 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useLessons, useStudents } from "@/hooks/use-data";
 import { api, qk } from "@/lib/api";
-import { formatDate } from "@/lib/domain";
+import { ASSESSMENT_SKILLS, formatDate } from "@/lib/domain";
+import type { AssessmentSkill } from "@/lib/domain";
+
+const ASSESSMENT_LABELS: Record<AssessmentSkill, string> = {
+  speaking: "Speaking",
+  listening: "Listening",
+  reading: "Reading",
+  writing: "Writing",
+  vocabulary: "Vocabulary",
+};
 
 export const Route = createFileRoute("/_authenticated/lessons/$id")({
   head: () => ({
@@ -54,6 +64,7 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 function LessonDetail() {
   const qc = useQueryClient();
   const { id } = Route.useParams();
+  const navigate = useNavigate();
   const lessons = useLessons();
   const students = useStudents();
   const [editOpen, setEditOpen] = useState(false);
@@ -65,6 +76,7 @@ function LessonDetail() {
       qc.invalidateQueries({ queryKey: qk.lessons });
       toast.success("Material successfully deleted.");
       setConfirmDelete(false);
+      navigate({ to: "/lessons" });
     },
     onError: () => toast.error("Something went wrong."),
   });
@@ -176,21 +188,51 @@ function LessonDetail() {
         </div>
       )}
 
+      <div className="rounded-xl border border-border bg-card p-4">
+        <p className="flex items-center gap-1.5 text-xs font-medium tracking-wide text-muted-foreground uppercase">
+          <ClipboardCheck className="size-4" /> Skill Assessment
+        </p>
+        <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+          {ASSESSMENT_SKILLS.map((skill) => {
+            const score = lesson[`${skill}_score`];
+            return (
+              <div key={skill} className="rounded-lg bg-muted/60 px-3 py-2.5">
+                <p className="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
+                  {ASSESSMENT_LABELS[skill]}
+                </p>
+                <p className="mt-0.5 font-semibold text-foreground">
+                  {score != null ? score : "Not Assessed"}
+                </p>
+              </div>
+            );
+          })}
+        </div>
+        {lesson.assessment_notes && (
+          <p className="mt-3 text-sm whitespace-pre-line text-foreground/90">
+            {lesson.assessment_notes}
+          </p>
+        )}
+      </div>
+
       <Section title="Learning objective">{lesson.objective}</Section>
 
       <Section title="Lesson content">{lesson.content}</Section>
 
       <Section title="Vocabulary">
-        {lesson.vocabulary ? (
+        {lesson.vocabulary?.trim() ? (
           <div className="flex flex-wrap gap-2">
-            {lesson.vocabulary.split(",").map((w) => (
-              <span
-                key={w}
-                className="rounded-full border border-border bg-muted px-2.5 py-0.5 text-xs font-medium"
-              >
-                {w.trim()}
-              </span>
-            ))}
+            {lesson.vocabulary
+              .split(",")
+              .map((w) => w.trim())
+              .filter(Boolean)
+              .map((w) => (
+                <span
+                  key={w}
+                  className="rounded-full border border-border bg-muted px-2.5 py-0.5 text-xs font-medium"
+                >
+                  {w}
+                </span>
+              ))}
           </div>
         ) : null}
       </Section>

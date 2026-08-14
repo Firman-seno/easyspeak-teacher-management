@@ -51,10 +51,14 @@ export const Route = createFileRoute("/_authenticated/students/")({
       { title: "Students — EasySpeak Teacher Management" },
       {
         name: "description",
-        content: "Search, filter and manage every enrolled student, their level, attendance and progress.",
+        content:
+          "Search, filter and manage every enrolled student, their level, attendance and progress.",
       },
       { property: "og:title", content: "Students — EasySpeak Teacher Management" },
-      { property: "og:description", content: "Full student directory with attendance and progress." },
+      {
+        property: "og:description",
+        content: "Full student directory with attendance and progress.",
+      },
     ],
   }),
   component: StudentsPage,
@@ -117,8 +121,11 @@ function StudentsPage() {
     filtered.sort((a, b) => {
       if (sort === "progress") return b.progress - a.progress;
       if (sort === "attendance") return b.att.rate - a.att.rate;
-      if (sort === "level") return LEVELS.indexOf(b.student.current_level as never) -
-        LEVELS.indexOf(a.student.current_level as never);
+      if (sort === "level")
+        return (
+          LEVELS.indexOf(b.student.current_level as never) -
+          LEVELS.indexOf(a.student.current_level as never)
+        );
       return a.student.name.localeCompare(b.student.name);
     });
 
@@ -138,7 +145,10 @@ function StudentsPage() {
   ]);
 
   const pageCount = Math.max(1, Math.ceil(rows.length / PAGE_SIZE));
-  const current = rows.slice((Math.min(page, pageCount) - 1) * PAGE_SIZE, Math.min(page, pageCount) * PAGE_SIZE);
+  const current = rows.slice(
+    (Math.min(page, pageCount) - 1) * PAGE_SIZE,
+    Math.min(page, pageCount) * PAGE_SIZE,
+  );
 
   return (
     <div className="space-y-6">
@@ -258,7 +268,9 @@ function StudentsPage() {
                       <TableCell>
                         <div className="flex min-w-0 items-center gap-3">
                           <Avatar className="size-9 shrink-0">
-                            {student.photo && <AvatarImage src={student.photo} alt={student.name} />}
+                            {student.photo && (
+                              <AvatarImage src={student.photo} alt={student.name} />
+                            )}
                             <AvatarFallback>{initials(student.name)}</AvatarFallback>
                           </Avatar>
                           <div className="min-w-0">
@@ -290,7 +302,9 @@ function StudentsPage() {
                         {stats.completed}/{stats.total} ({stats.completionRate}%)
                       </TableCell>
                       <TableCell>
-                        <StatusBadge tone={statusTone(student.status)}>{student.status}</StatusBadge>
+                        <StatusBadge tone={statusTone(student.status)}>
+                          {student.status}
+                        </StatusBadge>
                       </TableCell>
                       <TableCell>
                         <div className="flex justify-end gap-1">

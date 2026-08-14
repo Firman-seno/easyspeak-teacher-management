@@ -1,14 +1,6 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
-import {
-  Eye,
-  FolderKanban,
-  MoreVertical,
-  Pencil,
-  Plus,
-  Search,
-  Trash2,
-} from "lucide-react";
+import { Eye, FolderKanban, MoreVertical, Pencil, Plus, Search, Trash2 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 
@@ -39,7 +31,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { useProjects, useStudents } from "@/hooks/use-data";
+import { useLessons, useProjects, useStudents } from "@/hooks/use-data";
 import { api, qk } from "@/lib/api";
 import { PROJECT_STATUSES, PROJECT_TYPES, effectiveProjectStatus, formatDate } from "@/lib/domain";
 import type { Project } from "@/lib/domain";
@@ -67,6 +59,7 @@ function ProjectsPage() {
   const qc = useQueryClient();
   const projects = useProjects();
   const students = useStudents();
+  const lessons = useLessons();
 
   const [search, setSearch] = useState("");
   const [studentId, setStudentId] = useState("all");
@@ -114,7 +107,10 @@ function ProjectsPage() {
     if (studentId !== "all") {
       const current = list.find((s) => s.id === studentId);
       if (current) {
-        list.splice(list.findIndex((s) => s.id === studentId), 1);
+        list.splice(
+          list.findIndex((s) => s.id === studentId),
+          1,
+        );
         list.unshift(current);
       }
     }
@@ -351,7 +347,7 @@ function ProjectsPage() {
         onOpenChange={setFormOpen}
         project={editing}
         students={students.data ?? []}
-        lessons={[]}
+        lessons={lessons.data ?? []}
       />
 
       <ConfirmDialog

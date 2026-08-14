@@ -59,7 +59,8 @@ export const Route = createFileRoute("/_authenticated/dashboard")({
       { property: "og:title", content: "Dashboard — EasySpeak Teacher Management" },
       {
         property: "og:description",
-        content: "Live teaching statistics: attendance, progress, assignments, projects and levels.",
+        content:
+          "Live teaching statistics: attendance, progress, assignments, projects and levels.",
       },
     ],
   }),
@@ -153,13 +154,14 @@ function Dashboard() {
 
     return {
       totalStudents: active.length,
-      todayAttendance: records.filter((r) => r.date === today && r.status !== "Absent").length,
+      todayAttendance: records.filter(
+        (r) => r.date === today && (r.status === "Present" || r.status === "Late"),
+      ).length,
       monthRate: summarizeAttendance(monthRecords).rate,
       activeAssignments:
         (assignmentCounts["Assigned"] ?? 0) + (assignmentCounts["In Progress"] ?? 0),
       completedAssignments: assignmentCounts["Completed"] ?? 0,
-      activeProjects:
-        (projectCounts["Planned"] ?? 0) + (projectCounts["In Progress"] ?? 0),
+      activeProjects: (projectCounts["Planned"] ?? 0) + (projectCounts["In Progress"] ?? 0),
       completedProjects: projectCounts["Completed"] ?? 0,
       avgProgress,
       attention: attention.length,
@@ -297,7 +299,12 @@ function Dashboard() {
                 <Tooltip />
                 <Line type="monotone" dataKey="present" stroke="var(--chart-1)" strokeWidth={2} />
                 <Line type="monotone" dataKey="late" stroke="var(--chart-4)" strokeWidth={2} />
-                <Line type="monotone" dataKey="absent" stroke="var(--destructive)" strokeWidth={2} />
+                <Line
+                  type="monotone"
+                  dataKey="absent"
+                  stroke="var(--destructive)"
+                  strokeWidth={2}
+                />
               </LineChart>
             </ResponsiveContainer>
           </CardContent>

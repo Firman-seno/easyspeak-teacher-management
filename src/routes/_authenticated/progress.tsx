@@ -17,7 +17,14 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { useAssignments, useAttendance, useLessons, useProgress, useProjects, useStudents } from "@/hooks/use-data";
+import {
+  useAssignments,
+  useAttendance,
+  useLessons,
+  useProgress,
+  useProjects,
+  useStudents,
+} from "@/hooks/use-data";
 import { api, qk } from "@/lib/api";
 import {
   SKILLS,
@@ -96,7 +103,18 @@ function ProgressPage() {
   );
 
   useEffect(() => {
-    if (!selectedProgress) return;
+    if (!selectedProgress) {
+      setSkills({
+        speaking: "",
+        listening: "",
+        reading: "",
+        writing: "",
+        vocabulary: "",
+        grammar: "",
+      });
+      setNotes("");
+      return;
+    }
     setSkills({
       speaking: String(selectedProgress.speaking),
       listening: String(selectedProgress.listening),
@@ -139,7 +157,14 @@ function ProgressPage() {
       projectsTotal: projStats.total,
       avgAttendance,
     };
-  }, [students.data, attendance.data, lessons.data, assignments.data, projects.data, progress.data]);
+  }, [
+    students.data,
+    attendance.data,
+    lessons.data,
+    assignments.data,
+    projects.data,
+    progress.data,
+  ]);
 
   const selectedData = useMemo(() => {
     if (!selected) return null;
@@ -167,11 +192,13 @@ function ProgressPage() {
   const save = useMutation({
     mutationFn: () => {
       if (!selected) throw new Error("No student selected");
+      const parseSkill = (v: string) => {
+        if (v.trim() === "") return 0;
+        const n = Number(v);
+        return Number.isFinite(n) ? Math.min(100, Math.max(0, n)) : 0;
+      };
       const parsed = Object.fromEntries(
-        Object.entries(skills).map(([k, v]) => [
-          k,
-          v === "" ? 0 : Math.min(100, Math.max(0, Number(v))),
-        ]),
+        Object.entries(skills).map(([k, v]) => [k, parseSkill(v)]),
       ) as Record<Skill, number>;
       const values: TablesUpdate<"progress"> = {
         ...parsed,
@@ -369,15 +396,16 @@ function ProgressPage() {
                     <div className="flex justify-between text-sm">
                       <span>Assignments Progress</span>
                       <span className="font-medium">
-                        {selectedData?.assignDone ?? 0} / {selectedData?.assignTotal ?? 0}{" "}
-                        Completed
+                        {selectedData?.assignDone ?? 0} / {selectedData?.assignTotal ?? 0} Completed
                       </span>
                     </div>
                     <ProgressBar
                       className="mt-1.5"
                       value={
                         selectedData?.assignTotal
-                          ? Math.round(((selectedData.assignDone ?? 0) / selectedData.assignTotal) * 100)
+                          ? Math.round(
+                              ((selectedData.assignDone ?? 0) / selectedData.assignTotal) * 100,
+                            )
                           : 0
                       }
                       tone="accent"
