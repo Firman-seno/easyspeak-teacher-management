@@ -477,6 +477,30 @@ export type Database = {
           },
         ]
       }
+      profiles: {
+        Row: {
+          created_at: string
+          full_name: string
+          id: string
+          updated_at: string
+          whatsapp: string
+        }
+        Insert: {
+          created_at?: string
+          full_name?: string
+          id: string
+          updated_at?: string
+          whatsapp?: string
+        }
+        Update: {
+          created_at?: string
+          full_name?: string
+          id?: string
+          updated_at?: string
+          whatsapp?: string
+        }
+        Relationships: []
+      }
       projects: {
         Row: {
           attachment: string | null
@@ -671,7 +695,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      whatsapp_is_registered: {
+        Args: { target: string }
+        Returns: boolean
+      }
     }
     Enums: {
       [_ in never]: never

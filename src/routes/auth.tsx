@@ -31,11 +31,25 @@ export const Route = createFileRoute("/auth")({
   component: AuthPage,
 });
 
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const INDONESIAN_WHATSAPP_PATTERN = /^62(8\d{8,12})$/;
+
+function normalizeWhatsApp(value: string): string {
+  const digits = value.replace(/[^\d]/g, "");
+  if (digits.startsWith("0")) return `62${digits.slice(1)}`;
+  if (digits.startsWith("8")) return `62${digits}`;
+  return digits;
+}
+
 function AuthPage() {
   const navigate = useNavigate();
+  const [tab, setTab] = useState<"signin" | "signup">("signin");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [loading, setLoading] = useState(false);
+  const [fullName, setFullName] = useState("");
+  const [whatsapp, setWhatsapp] = useState("");
+  const [submitting, setSubmitting] = useState<"signin" | "signup" | null>(null);
+  const loading = submitting !== null;
 
   const [view, setView] = useState<"signin" | "reset">("signin");
   const [resetEmail, setResetEmail] = useState("");
@@ -48,44 +62,132 @@ function AuthPage() {
     });
   }, [navigate]);
 
+  const logAuthError = (err: unknown, context: string) => {
+    const e = err as Error & { code?: string; status?: number; name?: string };
+    console.error(`[auth] ${context}`, {
+      message: e?.message,
+      code: e?.code,
+      status: e?.status,
+      name: e?.name,
+    });
+  };
+
+  const validateSignup = (): string | null => {
+    if (!fullName.trim()) return "Full name is required.";
+    if (!email.trim()) return "Email is required.";
+    if (!EMAIL_PATTERN.test(email.trim())) return "Please enter a valid email address.";
+    if (!whatsapp.trim()) return "WhatsApp number is required.";
+    if (!INDONESIAN_WHATSAPP_PATTERN.test(normalizeWhatsApp(whatsapp)))
+      return "Please enter a valid WhatsApp number.";
+    if (password.length < 8) return "Password must be at least 8 characters.";
+    return null;
+  };
+
   const submit = async (mode: "signin" | "signup") => {
     if (loading) return;
-    if (!email || !password) {
-      toast.error("Email and password are required.");
-      return;
-    }
-    if (mode === "signup" && password.length < 8) {
-      toast.error("Password must be at least 8 characters.");
-      return;
-    }
-    setLoading(true);
-    const result =
-      mode === "signin"
-        ? await supabase.auth.signInWithPassword({ email, password })
-        : await supabase.auth.signUp({
-            email,
-            password,
-            options: { emailRedirectTo: window.location.origin },
-          });
-    setLoading(false);
-    if (result.error) {
-      if (
-        mode === "signin" &&
-        (result.error.message.includes("Invalid login credentials") ||
-          result.error.message.toLowerCase().includes("invalid email"))
-      ) {
-        toast.error("Invalid email or password. Please try again.");
-      } else {
-        toast.error(result.error.message);
+
+    if (mode === "signin") {
+      if (!email.trim() || !password) {
+        toast.error("Email and password are required.");
+        return;
       }
-      return;
+      if (!EMAIL_PATTERN.test(email.trim())) {
+        toast.error("Please enter a valid email address.");
+        return;
+      }
+    } else {
+      const invalid = validateSignup();
+      if (invalid) {
+        toast.error(invalid);
+        return;
+      }
     }
-    if (mode === "signup" && !result.data.session) {
-      toast.success("Account created. Check your email to confirm your account.");
-      return;
+
+    setSubmitting(mode);
+    try {
+      if (mode === "signin") {
+        const result = await supabase.auth.signInWithPassword({
+          email: email.trim(),
+          password,
+        });
+        if (result.error) {
+          const message = result.error.message.toLowerCase();
+          if (
+            message.includes("invalid login credentials") ||
+            message.includes("invalid email") ||
+            message.includes("email not confirmed")
+          ) {
+            toast.error("Invalid email or password. Please try again.");
+          } else {
+            logAuthError(result.error, "sign in failed");
+            toast.error("Unable to sign in. Please try again.");
+          }
+          return;
+        }
+        toast.success("Welcome back.");
+        navigate({ to: "/dashboard" });
+        return;
+      }
+
+      const whatsappNumber = normalizeWhatsApp(whatsapp);
+
+      const { data: whatsappExists, error: whatsappCheckError } = await supabase.rpc(
+        "whatsapp_is_registered",
+        { target: whatsappNumber },
+      );
+      if (whatsappCheckError) {
+        logAuthError(whatsappCheckError, "whatsapp uniqueness check failed");
+      }
+      if (whatsappExists === true) {
+        toast.error("This WhatsApp number is already registered.");
+        return;
+      }
+
+      const result = await supabase.auth.signUp({
+        email: email.trim(),
+        password,
+        options: {
+          data: { full_name: fullName.trim(), whatsapp: whatsappNumber },
+          emailRedirectTo: window.location.origin,
+        },
+      });
+
+      if (result.error) {
+        const message = result.error.message.toLowerCase();
+        if (message.includes("already registered")) {
+          toast.error("An account with this email already exists.");
+          setTab("signin");
+          return;
+        }
+        if (message.includes("whatsapp") || message.includes("duplicate key")) {
+          toast.error("This WhatsApp number is already registered.");
+          return;
+        }
+        logAuthError(result.error, "sign up failed");
+        toast.error("Unable to create your account. Please try again.");
+        return;
+      }
+
+      if (result.data.user?.identities?.length === 0) {
+        toast.error("An account with this email already exists.");
+        setTab("signin");
+        return;
+      }
+
+      if (result.data.session) {
+        toast.success("Account created successfully!");
+        navigate({ to: "/dashboard" });
+        return;
+      }
+
+      toast.success("Account created successfully. Please sign in.");
+      setTab("signin");
+    } catch (err) {
+      logAuthError(err, "authentication request failed");
+      toast.error("Unable to create your account. Please try again.");
+    } finally {
+      setSubmitting(null);
     }
-    toast.success(mode === "signin" ? "Welcome back." : "Account created.");
-    navigate({ to: "/dashboard" });
   };
 
   const sendResetLink = async (email: string) => {
@@ -248,48 +350,133 @@ function AuthPage() {
                 </form>
               )
             ) : (
-              <Tabs defaultValue="signin">
+              <Tabs value={tab} onValueChange={(value) => setTab(value as "signin" | "signup")}>
                 <TabsList className="grid w-full grid-cols-2">
                   <TabsTrigger value="signin">Sign in</TabsTrigger>
-                  <TabsTrigger value="signup">Create account</TabsTrigger>
+                  <TabsTrigger value="signup">Register</TabsTrigger>
                 </TabsList>
-                {(["signin", "signup"] as const).map((mode) => (
-                  <TabsContent key={mode} value={mode} className="mt-4 space-y-4">
+                <TabsContent value="signin" className="mt-4 space-y-4">
+                  <form
+                    className="space-y-4"
+                    noValidate
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      void submit("signin");
+                    }}
+                  >
                     <div className="space-y-2">
-                      <Label htmlFor={`${mode}-email`}>Email</Label>
+                      <Label htmlFor="signin-email">Email</Label>
                       <Input
-                        id={`${mode}-email`}
+                        id="signin-email"
                         type="email"
+                        autoComplete="email"
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
                         placeholder="teacher@easyspeak.com"
+                        disabled={loading}
                       />
                     </div>
                     <div className="space-y-2">
                       <div className="flex items-center justify-between">
-                        <Label htmlFor={`${mode}-password`}>Password</Label>
-                        {mode === "signin" && (
-                          <button
-                            type="button"
-                            onClick={() => setView("reset")}
-                            className="text-xs font-medium text-accent-foreground underline-offset-4 hover:underline"
-                          >
-                            Forgot password?
-                          </button>
-                        )}
+                        <Label htmlFor="signin-password">Password</Label>
+                        <button
+                          type="button"
+                          onClick={() => setView("reset")}
+                          className="text-xs font-medium text-accent-foreground underline-offset-4 hover:underline"
+                        >
+                          Forgot password?
+                        </button>
                       </div>
                       <PasswordInput
-                        id={`${mode}-password`}
+                        id="signin-password"
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
                         placeholder="••••••••"
+                        disabled={loading}
                       />
                     </div>
-                    <Button className="w-full" disabled={loading} onClick={() => submit(mode)}>
-                      {mode === "signin" ? "Sign in" : "Create account"}
+                    <Button type="submit" className="w-full" disabled={loading}>
+                      {submitting === "signin" ? (
+                        <>
+                          <Loader2 className="size-4 animate-spin" /> Signing in…
+                        </>
+                      ) : (
+                        "Sign in"
+                      )}
                     </Button>
-                  </TabsContent>
-                ))}
+                  </form>
+                </TabsContent>
+                <TabsContent value="signup" className="mt-4 space-y-4">
+                  <form
+                    className="space-y-4"
+                    noValidate
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      void submit("signup");
+                    }}
+                  >
+                    <div className="space-y-2">
+                      <Label htmlFor="signup-full-name">Full name</Label>
+                      <Input
+                        id="signup-full-name"
+                        type="text"
+                        autoComplete="name"
+                        value={fullName}
+                        onChange={(e) => setFullName(e.target.value)}
+                        placeholder="Jane Doe"
+                        disabled={loading}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="signup-email">Email</Label>
+                      <Input
+                        id="signup-email"
+                        type="email"
+                        autoComplete="email"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        placeholder="teacher@easyspeak.com"
+                        disabled={loading}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="signup-whatsapp">WhatsApp number</Label>
+                      <Input
+                        id="signup-whatsapp"
+                        type="tel"
+                        inputMode="tel"
+                        autoComplete="tel"
+                        value={whatsapp}
+                        onChange={(e) => setWhatsapp(e.target.value)}
+                        placeholder="081234567890"
+                        disabled={loading}
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        Used to reset your password via WhatsApp OTP.
+                      </p>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="signup-password">Password</Label>
+                      <PasswordInput
+                        id="signup-password"
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        placeholder="••••••••"
+                        disabled={loading}
+                      />
+                      <p className="text-xs text-muted-foreground">At least 8 characters.</p>
+                    </div>
+                    <Button type="submit" className="w-full" disabled={loading}>
+                      {submitting === "signup" ? (
+                        <>
+                          <Loader2 className="size-4 animate-spin" /> Creating account…
+                        </>
+                      ) : (
+                        "Create account"
+                      )}
+                    </Button>
+                  </form>
+                </TabsContent>
               </Tabs>
             )}
           </CardContent>
