@@ -10,6 +10,7 @@ import {
   effectiveAssignmentStatus,
   effectiveProjectStatus,
   formatDate,
+  formatDuration,
   formatScore,
 } from "./domain";
 import type { Assignment, Lesson, MonthlyReport, Project, Student } from "./domain";
@@ -172,8 +173,13 @@ export function buildReportPdf({
   if (lessons.length) {
     section("Materials Covered");
     table(
-      ["Date", "Title", "Topic"],
-      lessons.map((l) => [formatDate(l.date), l.title, l.topic ?? "-"]),
+      ["Date", "Title", "Topic", "Duration"],
+      lessons.map((l) => [
+        formatDate(l.date),
+        l.title,
+        l.topic ?? "-",
+        formatDuration(l.duration) ?? "-",
+      ]),
     );
   }
 
@@ -222,7 +228,6 @@ export function buildReportPdf({
   paragraph("Strengths", report.strengths ?? "");
   paragraph("Areas to Improve", report.areas_to_improve ?? "");
   paragraph("Teacher's Evaluation", report.teacher_evaluation ?? "");
-  paragraph("Next Month's Goals", report.next_month_goals ?? "");
   paragraph("Recommendations", report.recommendations ?? "");
 
   if (y > 640) {

@@ -30,11 +30,19 @@ const scoreSchema = z
     "Score must be a number between 0 and 100.",
   );
 
+const durationSchema = z
+  .string()
+  .refine(
+    (v) => v === "" || (/^\d{1,4}$/.test(v) && Number(v) > 0),
+    "Duration must be a whole number greater than 0.",
+  );
+
 const schema = z.object({
   studentId: z.string().min(1, "Please select a student."),
   title: z.string().trim().min(1, "Please enter lesson title.").max(200),
   subtitle: z.string().trim().max(200),
   successIndicator: z.string().trim().max(1000),
+  duration: durationSchema,
   speakingScore: scoreSchema,
   listeningScore: scoreSchema,
   readingScore: scoreSchema,
@@ -61,6 +69,7 @@ const empty: FormValues = {
   title: "",
   subtitle: "",
   successIndicator: "",
+  duration: "",
   speakingScore: "",
   listeningScore: "",
   readingScore: "",
@@ -101,6 +110,7 @@ export function LessonFormDialog({
         title: lesson.title,
         subtitle: lesson.subtitle ?? "",
         successIndicator: lesson.success_indicator ?? "",
+        duration: lesson.duration != null ? String(lesson.duration) : "",
         speakingScore: lesson.speaking_score != null ? String(lesson.speaking_score) : "",
         listeningScore: lesson.listening_score != null ? String(lesson.listening_score) : "",
         readingScore: lesson.reading_score != null ? String(lesson.reading_score) : "",
@@ -129,6 +139,7 @@ export function LessonFormDialog({
         program: student?.program ?? null,
         level: student?.current_level ?? null,
         success_indicator: payload.successIndicator.trim() || null,
+        duration: payload.duration === "" ? null : Number(payload.duration),
         speaking_score: payload.speakingScore === "" ? null : Number(payload.speakingScore),
         listening_score: payload.listeningScore === "" ? null : Number(payload.listeningScore),
         reading_score: payload.readingScore === "" ? null : Number(payload.readingScore),
@@ -156,6 +167,7 @@ export function LessonFormDialog({
       title: content.title,
       subtitle: content.subtitle,
       successIndicator: content.successIndicator,
+      duration: content.duration != null ? String(content.duration) : v.duration,
     }));
     setErrors((e) => {
       const next = { ...e };
@@ -281,8 +293,8 @@ export function LessonFormDialog({
                 <Search className="size-4" /> Use Existing Content
               </Button>
               <p className="mt-1 text-center text-xs text-muted-foreground">
-                Reuse the Title, Subtitle and Success Indicator from a lesson you have already
-                created.
+                Reuse the Title, Subtitle, Success Indicator and Duration from a lesson you have
+                already created. Duration is copied only when the source lesson has one.
               </p>
             </div>
 
@@ -365,7 +377,26 @@ export function LessonFormDialog({
               </div>
             </div>
 
-            <div className="sm:col-span-2">{field("date", "Date *", "date")}</div>
+            <div className="space-y-1.5">
+              <Label htmlFor="lesson-duration">Duration (minutes)</Label>
+              <Input
+                id="lesson-duration"
+                type="number"
+                min={1}
+                inputMode="numeric"
+                placeholder="e.g. 60"
+                value={values.duration}
+                onChange={(e) => set("duration", e.target.value)}
+              />
+              <p className="text-xs text-muted-foreground">
+                Enter the estimated duration of this lesson in minutes.
+              </p>
+              {errors["duration"] && (
+                <p className="text-xs text-destructive">{errors["duration"]}</p>
+              )}
+            </div>
+
+            <div className="space-y-1.5">{field("date", "Date *", "date")}</div>
           </div>
 
           <DialogFooter>

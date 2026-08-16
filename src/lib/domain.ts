@@ -168,6 +168,20 @@ export function formatScore(value: number): string {
   return rounded.toFixed(2).replace(/\.?0+$/, "");
 }
 
+// Formats a lesson duration in minutes into a human-friendly label.
+// Returns null when the duration is missing (NULL) or not a positive
+// number, so callers can simply omit the duration from the UI.
+export function formatDuration(minutes: number | null | undefined): string | null {
+  if (minutes == null || !Number.isFinite(minutes) || minutes <= 0) return null;
+  const total = Math.floor(minutes);
+  const hours = Math.floor(total / 60);
+  const mins = total % 60;
+  if (hours === 0) return `${mins} minute${mins === 1 ? "" : "s"}`;
+  const hourLabel = `${hours} hour${hours === 1 ? "" : "s"}`;
+  if (mins === 0) return hourLabel;
+  return `${hourLabel} ${mins} minute${mins === 1 ? "" : "s"}`;
+}
+
 // Builds the monthly_assessment JSON for a report from the month's lesson
 // scores. Final score / percentage equal the average because scores already
 // use the 0-100 scale.

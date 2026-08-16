@@ -1,6 +1,6 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { ArrowLeft, Download, Printer, Save } from "lucide-react";
+import { ArrowLeft, Clock, Download, Printer, Save } from "lucide-react";
 import { useEffect, useMemo } from "react";
 import { toast } from "sonner";
 import { z } from "zod";
@@ -35,6 +35,7 @@ import {
   effectiveAssignmentStatus,
   effectiveProjectStatus,
   formatDate,
+  formatDuration,
   formatScore,
 } from "@/lib/domain";
 import type { AssessmentSkill, Lesson, MonthlyReport } from "@/lib/domain";
@@ -534,9 +535,17 @@ function ReportDetail() {
                             : "Success indicator not added yet."}
                         </p>
                       </div>
-                      <span className="shrink-0 text-xs text-muted-foreground">
-                        {formatDate(l.date)}
-                      </span>
+                      <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
+                        <span className="text-xs whitespace-nowrap text-muted-foreground">
+                          {formatDate(l.date)}
+                        </span>
+                        {formatDuration(l.duration) && (
+                          <span className="inline-flex items-center gap-1 rounded-full border border-border bg-muted px-2 py-0.5 text-xs font-medium text-foreground">
+                            <Clock className="size-3 text-muted-foreground" />
+                            {formatDuration(l.duration)}
+                          </span>
+                        )}
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -637,23 +646,13 @@ function ReportDetail() {
                 </div>
               </div>
             </section>
-            <section className="grid gap-8 md:grid-cols-2">
-              <div>
-                <h3 className="border-b-2 border-accent pb-1 text-xs font-semibold tracking-widest text-foreground uppercase">
-                  Next month&apos;s goals
-                </h3>
-                <p className="mt-3 text-sm whitespace-pre-line text-foreground/90">
-                  {report.next_month_goals ?? "—"}
-                </p>
-              </div>
-              <div>
-                <h3 className="border-b-2 border-accent pb-1 text-xs font-semibold tracking-widest text-foreground uppercase">
-                  Recommendations
-                </h3>
-                <p className="mt-3 text-sm whitespace-pre-line text-foreground/90">
-                  {report.recommendations ?? "—"}
-                </p>
-              </div>
+            <section>
+              <h3 className="border-b-2 border-accent pb-1 text-xs font-semibold tracking-widest text-foreground uppercase">
+                Recommendations
+              </h3>
+              <p className="mt-3 text-sm whitespace-pre-line text-foreground/90">
+                {report.recommendations ?? "—"}
+              </p>
             </section>
 
             <section className="flex flex-wrap items-end justify-between gap-6 pt-4">

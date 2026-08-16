@@ -22,13 +22,14 @@ import {
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { api, qk } from "@/lib/api";
-import { LEVELS, PROGRAMS, formatDate } from "@/lib/domain";
+import { LEVELS, PROGRAMS, formatDate, formatDuration } from "@/lib/domain";
 import type { LessonWithStudent } from "@/lib/api";
 
 export type ExistingLessonContent = {
   title: string;
   subtitle: string;
   successIndicator: string;
+  duration: number | null;
 };
 
 export function ExistingContentDialog({
@@ -91,6 +92,7 @@ export function ExistingContentDialog({
       title: lesson.title,
       subtitle: lesson.subtitle ?? "",
       successIndicator: lesson.success_indicator ?? "",
+      duration: lesson.duration,
     });
     toast.success(`Content copied from "${lesson.title}".`);
     onOpenChange(false);
@@ -102,8 +104,9 @@ export function ExistingContentDialog({
         <DialogHeader>
           <DialogTitle>Use Existing Content</DialogTitle>
           <DialogDescription>
-            Search lessons you have already created and reuse their Title, Subtitle and Success
-            Indicator for this new material.
+            Search lessons you have already created and reuse their Title, Subtitle, Success
+            Indicator and Duration for this new material. Duration is copied only when the source
+            lesson has one.
           </DialogDescription>
         </DialogHeader>
 
@@ -210,6 +213,7 @@ export function ExistingContentDialog({
                       <Users className="size-3" /> Used by: {lesson.students?.name ?? "—"}
                     </span>
                     <span>{formatDate(lesson.date)}</span>
+                    {lesson.duration != null && <span>{formatDuration(lesson.duration)}</span>}
                   </div>
                 </div>
                 <Button

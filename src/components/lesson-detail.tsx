@@ -14,7 +14,7 @@ import type { ReactNode } from "react";
 import { StatusBadge, statusTone } from "@/components/kit";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
-import { ASSESSMENT_SKILLS, formatDate } from "@/lib/domain";
+import { ASSESSMENT_SKILLS, formatDate, formatDuration } from "@/lib/domain";
 import type { AssessmentSkill, Lesson, Student } from "@/lib/domain";
 
 const ASSESSMENT_LABELS: Record<AssessmentSkill, string> = {
@@ -117,7 +117,7 @@ export function LessonDetailSheet({
               <Meta
                 icon={<Clock className="size-4" />}
                 label="Duration"
-                value={lesson?.duration != null ? `${lesson.duration} min` : undefined}
+                value={formatDuration(lesson?.duration) ?? undefined}
               />
             </div>
 

@@ -80,7 +80,6 @@ function ReportsPage() {
   const [recommendations, setRecommendations] = useState("");
   const [strengths, setStrengths] = useState("");
   const [areasToImprove, setAreasToImprove] = useState("");
-  const [nextMonthGoals, setNextMonthGoals] = useState("");
   const [toDelete, setToDelete] = useState<MonthlyReport | null>(null);
 
   const nameOf = useMemo(
@@ -242,7 +241,6 @@ function ReportsPage() {
         recommendations: recommendations.trim() || null,
         strengths: strengths.trim() || null,
         areas_to_improve: areasToImprove.trim() || null,
-        next_month_goals: nextMonthGoals.trim() || null,
       });
     },
     onSuccess: (report) => {
@@ -252,7 +250,6 @@ function ReportsPage() {
       setRecommendations("");
       setStrengths("");
       setAreasToImprove("");
-      setNextMonthGoals("");
       navigate({ to: "/reports/$id", params: { id: report.id } });
     },
     onError: (e: Error) => toast.error(e.message || "Something went wrong."),
@@ -372,16 +369,6 @@ function ReportsPage() {
                 value={areasToImprove}
                 onChange={(e) => setAreasToImprove(e.target.value)}
                 placeholder="Skills or habits to work on…"
-                rows={3}
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="next-month-goals">Next month goals</Label>
-              <Textarea
-                id="next-month-goals"
-                value={nextMonthGoals}
-                onChange={(e) => setNextMonthGoals(e.target.value)}
-                placeholder="Learning goals for next month…"
                 rows={3}
               />
             </div>
