@@ -321,7 +321,9 @@ export function inDateRange(date: string | null | undefined, start: string, end:
   return date >= start && date <= end;
 }
 
-export type ReportPeriodLike = Pick<MonthlyReport, "start_date" | "end_date" | "month" | "year">;
+export type ReportPeriodLike = Partial<
+  Pick<MonthlyReport, "start_date" | "end_date" | "month" | "year">
+>;
 
 // Effective inclusive [start, end] period of a report. New reports store
 // start_date/end_date directly; legacy reports that only have month/year
@@ -330,8 +332,17 @@ export function reportRange(report: ReportPeriodLike): { start: string; end: str
   if (report.start_date && report.end_date) {
     return { start: report.start_date, end: report.end_date };
   }
-  const y = report.year;
-  const m = report.month;
+
+  if (report.year == null || report.month == null) {
+    return { start: "", end: "" };
+  }
+
+  const y = Number(report.year);
+  const m = Number(report.month);
+  if (!Number.isFinite(y) || !Number.isFinite(m) || m < 1 || m > 12) {
+    return { start: "", end: "" };
+  }
+
   const lastDay = new Date(y, m, 0).getDate();
   return {
     start: `${y}-${String(m).padStart(2, "0")}-01`,
@@ -342,12 +353,14 @@ export function reportRange(report: ReportPeriodLike): { start: string; end: str
 // Short label, e.g. "02 Aug 2026 – 16 Aug 2026".
 export function reportPeriodShort(report: ReportPeriodLike): string {
   const { start, end } = reportRange(report);
+  if (!start || !end) return "—";
   return `${formatDate(start)} – ${formatDate(end)}`;
 }
 
 // Long label, e.g. "02 August 2026 – 16 August 2026".
 export function reportPeriodLong(report: ReportPeriodLike): string {
   const { start, end } = reportRange(report);
+  if (!start || !end) return "—";
   return `${formatDateLong(start)} – ${formatDateLong(end)}`;
 }
 

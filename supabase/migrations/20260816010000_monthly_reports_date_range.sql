@@ -3,24 +3,26 @@
 -- ------------------------------------------------------------
 -- Adds start_date / end_date (Postgres `date`, date-only) so a
 -- report period no longer has to be a full calendar month.
--- month / year are KEPT for legacy reports (never deleted) and
--- are still populated for new reports from the start date.
---
--- Existing reports are backfilled to their calendar month so they
--- keep working and display a proper date range.
+-- month / year are kept for legacy reports and are not deleted.
+-- New reports should prefer start_date / end_date as the primary
+-- period while remaining backward-compatible with older rows.
 -- Idempotent: safe to re-run.
 -- ============================================================
 ALTER TABLE public.monthly_reports
   ADD COLUMN IF NOT EXISTS start_date date,
   ADD COLUMN IF NOT EXISTS end_date date;
 
--- Backfill legacy reports to their calendar month boundaries.
+-- Keep legacy month/year rows readable even if they are still null.
+ALTER TABLE public.monthly_reports
+  ALTER COLUMN month DROP NOT NULL,
+  ALTER COLUMN year DROP NOT NULL;
+
+-- Backfill any legacy report that has month/year but not a date range.
 UPDATE public.monthly_reports
 SET
-  start_date = make_date(year, month, 1),
-  end_date = (make_date(year, month, 1) + interval '1 month - 1 day')::date
-WHERE start_date IS NULL
-  AND end_date IS NULL
+  start_date = COALESCE(start_date, make_date(year, month, 1)),
+  end_date = COALESCE(end_date, (make_date(year, month, 1) + interval '1 month - 1 day')::date)
+WHERE (start_date IS NULL OR end_date IS NULL)
   AND year IS NOT NULL
   AND month IS NOT NULL;
 

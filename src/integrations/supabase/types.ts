@@ -272,7 +272,7 @@ export type Database = {
           lessons_planned: number
           lessons_total: number
           level: string | null
-          month: number
+          month: number | null
           monthly_assessment: Json | null
           next_month_goals: string | null
           overall_progress: number
@@ -292,7 +292,7 @@ export type Database = {
           student_id: string
           teacher_evaluation: string | null
           total_meetings: number
-          year: number
+          year: number | null
         }
         Insert: {
           absent?: number
@@ -316,7 +316,7 @@ export type Database = {
           lessons_planned?: number
           lessons_total?: number
           level?: string | null
-          month: number
+          month?: number | null
           monthly_assessment?: Json | null
           next_month_goals?: string | null
           overall_progress?: number
@@ -336,7 +336,7 @@ export type Database = {
           student_id: string
           teacher_evaluation?: string | null
           total_meetings?: number
-          year: number
+          year?: number | null
         }
         Update: {
           absent?: number
@@ -360,7 +360,7 @@ export type Database = {
           lessons_planned?: number
           lessons_total?: number
           level?: string | null
-          month?: number
+          month?: number | null
           monthly_assessment?: Json | null
           next_month_goals?: string | null
           overall_progress?: number
@@ -380,7 +380,7 @@ export type Database = {
           student_id?: string
           teacher_evaluation?: string | null
           total_meetings?: number
-          year?: number
+          year?: number | null
         }
         Relationships: [
           {

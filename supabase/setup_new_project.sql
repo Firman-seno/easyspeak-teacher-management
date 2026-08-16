@@ -151,8 +151,10 @@ CREATE POLICY "progress_history_all" ON public.progress_history FOR ALL TO authe
 CREATE TABLE public.monthly_reports (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   student_id uuid NOT NULL REFERENCES public.students(id) ON DELETE CASCADE,
-  month int NOT NULL,
-  year int NOT NULL,
+  month int,
+  year int,
+  start_date date,
+  end_date date,
   total_meetings int NOT NULL DEFAULT 0,
   present int NOT NULL DEFAULT 0,
   late int NOT NULL DEFAULT 0,
@@ -167,7 +169,8 @@ CREATE TABLE public.monthly_reports (
   level text,
   teacher_evaluation text,
   recommendations text,
-  created_at timestamptz NOT NULL DEFAULT now()
+  created_at timestamptz NOT NULL DEFAULT now(),
+  CHECK (start_date IS NULL OR end_date IS NULL OR end_date >= start_date)
 );
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.monthly_reports TO authenticated;
 GRANT ALL ON public.monthly_reports TO service_role;
