@@ -207,11 +207,6 @@ function LessonDetail() {
             );
           })}
         </div>
-        {lesson.assessment_notes && (
-          <p className="mt-3 text-sm whitespace-pre-line text-foreground/90">
-            {lesson.assessment_notes}
-          </p>
-        )}
       </div>
 
       <Section title="Learning objective">{lesson.objective}</Section>

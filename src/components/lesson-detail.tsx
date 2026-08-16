@@ -153,13 +153,7 @@ export function LessonDetailSheet({
                   })}
                 </div>
               )}
-              {lesson?.assessment_notes && (
-                <p className="mt-2.5 text-sm whitespace-pre-line text-foreground/90">
-                  {lesson.assessment_notes}
-                </p>
-              )}
             </div>
-
             <DetailSection title="Learning objective">{lesson?.objective}</DetailSection>
 
             <DetailSection title="Lesson content">{lesson?.content}</DetailSection>

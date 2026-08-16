@@ -17,8 +17,7 @@ ALTER TABLE public.lessons
   ADD COLUMN IF NOT EXISTS writing_score int
     CHECK (writing_score IS NULL OR (writing_score BETWEEN 0 AND 100)),
   ADD COLUMN IF NOT EXISTS vocabulary_score int
-    CHECK (vocabulary_score IS NULL OR (vocabulary_score BETWEEN 0 AND 100)),
-  ADD COLUMN IF NOT EXISTS assessment_notes text;
+    CHECK (vocabulary_score IS NULL OR (vocabulary_score BETWEEN 0 AND 100));
 
 -- Manual monthly assessment data (Skill Analysis editor):
 -- {

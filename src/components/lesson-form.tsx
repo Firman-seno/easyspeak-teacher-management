@@ -47,7 +47,6 @@ const schema = z.object({
   readingScore: scoreSchema,
   writingScore: scoreSchema,
   vocabularyScore: scoreSchema,
-  assessmentNotes: z.string().trim().max(2000),
   date: z
     .string()
     .min(1, "Please choose a date.")
@@ -76,7 +75,6 @@ const empty: FormValues = {
   readingScore: "",
   writingScore: "",
   vocabularyScore: "",
-  assessmentNotes: "",
   date: todayISO(),
 };
 
@@ -118,7 +116,6 @@ export function LessonFormDialog({
         readingScore: lesson.reading_score != null ? String(lesson.reading_score) : "",
         writingScore: lesson.writing_score != null ? String(lesson.writing_score) : "",
         vocabularyScore: lesson.vocabulary_score != null ? String(lesson.vocabulary_score) : "",
-        assessmentNotes: lesson.assessment_notes ?? "",
         date: lesson.date.slice(0, 10),
       });
     } else if (presetStudent) {
@@ -151,7 +148,6 @@ export function LessonFormDialog({
         reading_score: payload.readingScore === "" ? null : Number(payload.readingScore),
         writing_score: payload.writingScore === "" ? null : Number(payload.writingScore),
         vocabulary_score: payload.vocabularyScore === "" ? null : Number(payload.vocabularyScore),
-        assessment_notes: payload.assessmentNotes.trim() || null,
         date: payload.date,
       };
       if (lesson) await api.updateLesson(lesson.id, data);
@@ -325,19 +321,6 @@ export function LessonFormDialog({
                   `${skill}Score` as keyof FormValues,
                   ASSESSMENT_LABELS[skill as AssessmentSkill],
                 ),
-              )}
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="lesson-assessmentNotes">Assessment Notes</Label>
-              <Textarea
-                id="lesson-assessmentNotes"
-                rows={2}
-                value={values.assessmentNotes}
-                onChange={(e) => set("assessmentNotes", e.target.value)}
-                placeholder="Optional note about this lesson's assessment, for example: Student was able to answer most speaking questions but still needs improvement in vocabulary."
-              />
-              {errors["assessmentNotes"] && (
-                <p className="text-xs text-destructive">{errors["assessmentNotes"]}</p>
               )}
             </div>
           </div>

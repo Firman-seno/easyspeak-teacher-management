@@ -129,7 +129,6 @@ export type Database = {
       }
       lessons: {
         Row: {
-          assessment_notes: string | null
           attachment: string | null
           content: string | null
           created_at: string
@@ -159,7 +158,6 @@ export type Database = {
           writing_score: number | null
         }
         Insert: {
-          assessment_notes?: string | null
           attachment?: string | null
           content?: string | null
           created_at?: string
@@ -189,7 +187,6 @@ export type Database = {
           writing_score?: number | null
         }
         Update: {
-          assessment_notes?: string | null
           attachment?: string | null
           content?: string | null
           created_at?: string
