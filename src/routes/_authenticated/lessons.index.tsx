@@ -1,20 +1,11 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
-import {
-  BookOpen,
-  CheckCircle2,
-  Eye,
-  MoreVertical,
-  Pencil,
-  Plus,
-  Search,
-  Trash2,
-  UserRound,
-} from "lucide-react";
+import { BookOpen, Eye, MoreVertical, Pencil, Plus, Search, Trash2 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 
 import { ConfirmDialog, EmptyState, PageHeader, StatusBadge, statusTone } from "@/components/kit";
+import { LessonDetailSheet } from "@/components/lesson-detail";
 import { LessonFormDialog } from "@/components/lesson-form";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -35,16 +26,8 @@ import {
 } from "@/components/ui/select";
 import { useLessons, useStudents } from "@/hooks/use-data";
 import { api, qk } from "@/lib/api";
-import { ASSESSMENT_SKILLS, LESSON_STATUSES, LEVELS, PROGRAMS, formatDate } from "@/lib/domain";
-import type { AssessmentSkill, Lesson } from "@/lib/domain";
-
-const ASSESSMENT_LABELS: Record<AssessmentSkill, string> = {
-  speaking: "Speaking",
-  listening: "Listening",
-  reading: "Reading",
-  writing: "Writing",
-  vocabulary: "Vocabulary",
-};
+import { LESSON_STATUSES, LEVELS, PROGRAMS, formatDate } from "@/lib/domain";
+import type { Lesson } from "@/lib/domain";
 
 export const Route = createFileRoute("/_authenticated/lessons/")({
   head: () => ({
@@ -81,6 +64,8 @@ function LessonsPage() {
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<Lesson | null>(null);
   const [toDelete, setToDelete] = useState<Lesson | null>(null);
+  const [detail, setDetail] = useState<Lesson | null>(null);
+  const [detailOpen, setDetailOpen] = useState(false);
 
   const nameOf = useMemo(
     () => new Map((students.data ?? []).map((s) => [s.id, s.name])),
@@ -149,6 +134,11 @@ function LessonsPage() {
   const openEdit = (lesson: Lesson) => {
     setEditing(lesson);
     setFormOpen(true);
+  };
+
+  const openDetail = (lesson: Lesson) => {
+    setDetail(lesson);
+    setDetailOpen(true);
   };
 
   return (
@@ -288,22 +278,31 @@ function LessonsPage() {
           }
         />
       ) : (
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
           {rows.map((lesson) => {
             const studentName = lesson.student_id ? (nameOf.get(lesson.student_id) ?? "—") : "—";
-            const student = lesson.student_id ? studentOf.get(lesson.student_id) : undefined;
             return (
-              <Card key={lesson.id} className="shadow-soft flex flex-col">
-                <CardContent className="flex flex-1 flex-col gap-3 p-5">
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="grid size-10 shrink-0 place-items-center rounded-xl bg-accent/15 text-accent-foreground">
-                      <BookOpen className="size-5" />
+              <Card key={lesson.id} className="shadow-soft">
+                <CardContent className="flex flex-col gap-2.5 p-4">
+                  <div className="flex items-center gap-2.5">
+                    <div className="grid size-9 shrink-0 place-items-center rounded-lg bg-accent/15 text-accent-foreground">
+                      <BookOpen className="size-4" />
                     </div>
-                    <div className="flex items-center gap-1">
+                    <div className="min-w-0 flex-1">
+                      <h3 className="truncate text-sm font-semibold text-foreground">
+                        {lesson.title}
+                      </h3>
+                      {(lesson.subtitle || lesson.unit) && (
+                        <p className="truncate text-xs text-muted-foreground">
+                          {lesson.subtitle ?? lesson.unit}
+                        </p>
+                      )}
+                    </div>
+                    <div className="flex shrink-0 items-center gap-0.5">
                       <StatusBadge tone={statusTone(lesson.status)}>{lesson.status}</StatusBadge>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon" title="Options">
+                          <Button variant="ghost" size="icon" title="Options" className="size-7">
                             <MoreVertical className="size-4" />
                           </Button>
                         </DropdownMenuTrigger>
@@ -328,96 +327,18 @@ function LessonsPage() {
                     </div>
                   </div>
 
-                  <div className="min-w-0">
-                    <h3 className="truncate font-semibold text-foreground">{lesson.title}</h3>
-                    {lesson.subtitle && (
-                      <p className="mt-0.5 truncate text-sm font-medium text-accent-foreground">
-                        {lesson.subtitle}
-                      </p>
-                    )}
-                    <p className="mt-0.5 truncate text-xs text-muted-foreground">
-                      {lesson.topic ?? "General topic"} • {lesson.unit ?? "No unit"}
+                  <div className="space-y-0.5">
+                    <p className="truncate text-sm font-medium text-foreground">{studentName}</p>
+                    <p className="truncate text-xs text-muted-foreground">
+                      {[lesson.level, lesson.program].filter(Boolean).join(" • ") ||
+                        "No level / program"}
                     </p>
+                    <p className="text-xs text-muted-foreground">{formatDate(lesson.date)}</p>
                   </div>
 
-                  <div className="flex items-center gap-2.5 rounded-lg bg-primary/5 px-3 py-2">
-                    <div className="grid size-8 shrink-0 place-items-center rounded-lg bg-accent/15 text-accent-foreground">
-                      <UserRound className="size-4" />
-                    </div>
-                    <div className="min-w-0">
-                      <p className="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
-                        Student
-                      </p>
-                      <p className="truncate text-sm font-semibold text-foreground">
-                        {studentName}
-                      </p>
-                    </div>
-                    {student && (
-                      <span className="ml-auto shrink-0 text-[11px] text-muted-foreground">
-                        {student.current_level}
-                      </span>
-                    )}
-                  </div>
-
-                  {(lesson.objective || lesson.content) && (
-                    <p className="line-clamp-2 text-sm text-muted-foreground">
-                      {lesson.objective ?? lesson.content}
-                    </p>
-                  )}
-
-                  {lesson.success_indicator && (
-                    <div className="flex items-start gap-2 rounded-lg bg-emerald-500/10 px-3 py-2 text-sm text-emerald-700">
-                      <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-emerald-600" />
-                      <span className="line-clamp-2">{lesson.success_indicator}</span>
-                    </div>
-                  )}
-
-                  <div className="rounded-lg bg-muted/60 px-3 py-2">
-                    <p className="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
-                      Skill Assessment
-                    </p>
-                    {ASSESSMENT_SKILLS.every((s) => lesson[`${s}_score`] == null) ? (
-                      <p className="mt-0.5 text-xs text-muted-foreground">No Assessment</p>
-                    ) : (
-                      <div className="mt-0.5 flex flex-wrap gap-x-2.5 gap-y-0.5 text-xs">
-                        {ASSESSMENT_SKILLS.map((skill) => {
-                          const score = lesson[`${skill}_score`];
-                          if (score == null) return null;
-                          return (
-                            <span key={skill} className="font-medium text-foreground">
-                              {ASSESSMENT_LABELS[skill]}{" "}
-                              <span className="text-muted-foreground">{score}</span>
-                            </span>
-                          );
-                        })}
-                      </div>
-                    )}
-                  </div>
-
-                  <dl className="mt-auto grid grid-cols-2 gap-2 text-xs">
-                    <div className="rounded-lg bg-muted px-2.5 py-2">
-                      <dt className="text-muted-foreground">Level</dt>
-                      <dd className="font-medium">{lesson.level ?? "—"}</dd>
-                    </div>
-                    <div className="rounded-lg bg-muted px-2.5 py-2">
-                      <dt className="text-muted-foreground">Program</dt>
-                      <dd className="truncate font-medium">{lesson.program ?? "—"}</dd>
-                    </div>
-                    <div className="rounded-lg bg-muted px-2.5 py-2">
-                      <dt className="text-muted-foreground">Teacher</dt>
-                      <dd className="truncate font-medium">{student?.teacher ?? "Teacher"}</dd>
-                    </div>
-                    <div className="rounded-lg bg-muted px-2.5 py-2">
-                      <dt className="text-muted-foreground">Date</dt>
-                      <dd className="font-medium">{formatDate(lesson.date)}</dd>
-                    </div>
-                  </dl>
-
-                  <div className="flex gap-2">
-                    <Button asChild size="sm" className="flex-1">
-                      <Link to="/lessons/$id" params={{ id: lesson.id }}>
-                        View Lesson
-                      </Link>
+                  <div className="mt-auto flex items-center gap-1.5 border-t pt-2.5">
+                    <Button size="sm" className="flex-1" onClick={() => openDetail(lesson)}>
+                      <Eye className="size-3.5" /> View Detail
                     </Button>
                     <Button
                       size="sm"
@@ -425,7 +346,7 @@ function LessonsPage() {
                       title="Edit"
                       onClick={() => openEdit(lesson)}
                     >
-                      <Pencil className="size-4" />
+                      <Pencil className="size-3.5" />
                     </Button>
                   </div>
                 </CardContent>
@@ -434,6 +355,17 @@ function LessonsPage() {
           })}
         </div>
       )}
+
+      <LessonDetailSheet
+        open={detailOpen}
+        onOpenChange={setDetailOpen}
+        lesson={detail}
+        student={detail?.student_id ? studentOf.get(detail.student_id) : undefined}
+        onEdit={(lesson) => {
+          setDetailOpen(false);
+          openEdit(lesson);
+        }}
+      />
 
       <LessonFormDialog
         open={formOpen}
