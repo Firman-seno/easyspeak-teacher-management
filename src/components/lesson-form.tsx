@@ -16,16 +16,9 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { api, qk } from "@/lib/api";
-import { ASSESSMENT_SKILLS, LEVELS, PROGRAMS, todayISO } from "@/lib/domain";
+import { ASSESSMENT_SKILLS, todayISO } from "@/lib/domain";
 import type { AssessmentSkill, Lesson, Student } from "@/lib/domain";
 
 const scoreSchema = z
@@ -39,8 +32,6 @@ const schema = z.object({
   studentId: z.string().min(1, "Please select a student."),
   title: z.string().trim().min(1, "Please enter lesson title.").max(200),
   subtitle: z.string().trim().max(200),
-  program: z.string().min(1, "Please choose a program."),
-  level: z.string().min(1, "Please choose a level."),
   successIndicator: z.string().trim().max(1000),
   speakingScore: scoreSchema,
   listeningScore: scoreSchema,
@@ -67,8 +58,6 @@ const empty: FormValues = {
   studentId: "",
   title: "",
   subtitle: "",
-  program: "",
-  level: "",
   successIndicator: "",
   speakingScore: "",
   listeningScore: "",
@@ -108,8 +97,6 @@ export function LessonFormDialog({
         studentId: lesson.student_id ?? "",
         title: lesson.title,
         subtitle: lesson.subtitle ?? "",
-        program: lesson.program ?? "",
-        level: lesson.level ?? "",
         successIndicator: lesson.success_indicator ?? "",
         speakingScore: lesson.speaking_score != null ? String(lesson.speaking_score) : "",
         listeningScore: lesson.listening_score != null ? String(lesson.listening_score) : "",
@@ -119,12 +106,7 @@ export function LessonFormDialog({
         date: lesson.date.slice(0, 10),
       });
     } else if (presetStudent) {
-      setValues({
-        ...empty,
-        studentId: presetStudent.id,
-        program: presetStudent.program,
-        level: presetStudent.current_level,
-      });
+      setValues({ ...empty, studentId: presetStudent.id });
     } else {
       setValues(empty);
     }
@@ -136,12 +118,13 @@ export function LessonFormDialog({
 
   const mutation = useMutation({
     mutationFn: async (payload: FormValues) => {
+      const student = students.find((s) => s.id === payload.studentId);
       const data = {
         student_id: payload.studentId,
         title: payload.title.trim(),
         subtitle: payload.subtitle.trim() || null,
-        program: payload.program,
-        level: payload.level,
+        program: student?.program ?? null,
+        level: student?.current_level ?? null,
         success_indicator: payload.successIndicator.trim() || null,
         speaking_score: payload.speakingScore === "" ? null : Number(payload.speakingScore),
         listening_score: payload.listeningScore === "" ? null : Number(payload.listeningScore),
@@ -165,6 +148,14 @@ export function LessonFormDialog({
   });
 
   const submit = () => {
+    const student = students.find((s) => s.id === values.studentId);
+    if (student && (!student.program || !student.current_level)) {
+      const message =
+        "This student does not have a program or level assigned. Please update the student's profile first.";
+      setErrors({ program: message });
+      toast.error(message);
+      return;
+    }
     const parsed = schema.safeParse(values);
     if (!parsed.success) {
       const fieldErrors: Record<string, string> = {};
@@ -223,25 +214,6 @@ export function LessonFormDialog({
     </div>
   );
 
-  const selectField = (key: keyof FormValues, label: string, options: readonly string[]) => (
-    <div className="space-y-1.5">
-      <Label>{label}</Label>
-      <Select value={values[key] ?? ""} onValueChange={(v) => set(key, v)}>
-        <SelectTrigger>
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>
-          {options.map((o) => (
-            <SelectItem key={o} value={o}>
-              {o}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-      {errors[key] && <p className="text-xs text-destructive">{errors[key]}</p>}
-    </div>
-  );
-
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-lg">
@@ -260,14 +232,7 @@ export function LessonFormDialog({
             <StudentCombobox
               students={students}
               value={values.studentId}
-              onChange={(id, student) =>
-                setValues((v) => ({
-                  ...v,
-                  studentId: id,
-                  program: student?.program ?? v.program,
-                  level: student?.current_level ?? v.level,
-                }))
-              }
+              onChange={(id) => setValues((v) => ({ ...v, studentId: id }))}
             />
             {selectedStudent ? (
               <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
@@ -296,8 +261,27 @@ export function LessonFormDialog({
             )}
           </div>
 
-          {selectField("program", "Program *", PROGRAMS)}
-          {selectField("level", "Level *", LEVELS)}
+          <div className="space-y-1.5">
+            <Label>Program *</Label>
+            <Input
+              value={selectedStudent?.program ?? ""}
+              readOnly
+              placeholder="Select a student first"
+              className="cursor-default bg-muted/50"
+            />
+            {errors["program"] && <p className="text-xs text-destructive">{errors["program"]}</p>}
+          </div>
+
+          <div className="space-y-1.5">
+            <Label>Level *</Label>
+            <Input
+              value={selectedStudent?.current_level ?? ""}
+              readOnly
+              placeholder="Select a student first"
+              className="cursor-default bg-muted/50"
+            />
+            {errors["level"] && <p className="text-xs text-destructive">{errors["level"]}</p>}
+          </div>
 
           <div className="sm:col-span-2">
             {textareaField(
