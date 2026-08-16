@@ -1,10 +1,20 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { BookOpen, Eye, MoreVertical, Pencil, Plus, Search, Trash2 } from "lucide-react";
+import {
+  BookOpen,
+  Check,
+  ChevronDown,
+  Eye,
+  MoreVertical,
+  Pencil,
+  Plus,
+  Search,
+  Trash2,
+} from "lucide-react";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 
-import { ConfirmDialog, EmptyState, PageHeader, StatusBadge, statusTone } from "@/components/kit";
+import { ConfirmDialog, EmptyState, PageHeader, statusTone, toneClass } from "@/components/kit";
 import { LessonDetailSheet } from "@/components/lesson-detail";
 import { LessonFormDialog } from "@/components/lesson-form";
 import { Button } from "@/components/ui/button";
@@ -28,6 +38,7 @@ import { useLessons, useStudents } from "@/hooks/use-data";
 import { api, qk } from "@/lib/api";
 import { LESSON_STATUSES, LEVELS, PROGRAMS, formatDate } from "@/lib/domain";
 import type { Lesson } from "@/lib/domain";
+import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/_authenticated/lessons/")({
   head: () => ({
@@ -109,6 +120,32 @@ function LessonsPage() {
       setToDelete(null);
     },
     onError: () => toast.error("Something went wrong."),
+  });
+
+  const changeStatus = useMutation({
+    mutationFn: ({ id, status }: { id: string; status: string }) =>
+      api.updateLesson(id, { status }),
+    onMutate: async ({ id, status }) => {
+      await qc.cancelQueries({ queryKey: qk.lessons });
+      const previous = qc.getQueryData<Lesson[]>(qk.lessons);
+      if (previous) {
+        qc.setQueryData<Lesson[]>(
+          qk.lessons,
+          previous.map((l) => (l.id === id ? { ...l, status } : l)),
+        );
+      }
+      return { previous };
+    },
+    onError: (_error, _vars, context) => {
+      if (context?.previous) qc.setQueryData(qk.lessons, context.previous);
+      toast.error("Something went wrong.");
+    },
+    onSettled: () => {
+      qc.invalidateQueries({ queryKey: qk.lessons });
+    },
+    onSuccess: () => {
+      toast.success("Status updated.");
+    },
   });
 
   const studentOptions = useMemo(() => {
@@ -299,7 +336,36 @@ function LessonsPage() {
                       )}
                     </div>
                     <div className="flex shrink-0 items-center gap-0.5">
-                      <StatusBadge tone={statusTone(lesson.status)}>{lesson.status}</StatusBadge>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <button
+                            type="button"
+                            className={cn(
+                              "inline-flex cursor-pointer items-center gap-1 rounded-full border px-2.5 py-0.5 text-xs font-medium whitespace-nowrap transition-opacity hover:opacity-80 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1",
+                              toneClass[statusTone(lesson.status)],
+                            )}
+                          >
+                            {lesson.status}
+                            <ChevronDown className="size-3" />
+                          </button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="min-w-36">
+                          {LESSON_STATUSES.map((s) => (
+                            <DropdownMenuItem
+                              key={s}
+                              onClick={() => changeStatus.mutate({ id: lesson.id, status: s })}
+                            >
+                              <Check
+                                className={cn(
+                                  "size-3.5",
+                                  lesson.status === s ? "opacity-100" : "opacity-0",
+                                )}
+                              />
+                              {s}
+                            </DropdownMenuItem>
+                          ))}
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                           <Button variant="ghost" size="icon" title="Options" className="size-7">

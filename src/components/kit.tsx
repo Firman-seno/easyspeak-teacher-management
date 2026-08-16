@@ -25,6 +25,8 @@ const toneClass: Record<Tone, string> = {
   muted: "bg-muted text-muted-foreground border-border",
 };
 
+export { toneClass };
+
 export function StatusBadge({
   tone = "muted",
   children,
@@ -52,6 +54,7 @@ export function statusTone(status: string): Tone {
     case "Active":
     case "Present":
     case "Completed":
+    case "Complete":
     case "Excellent":
       return "success";
     case "Late":

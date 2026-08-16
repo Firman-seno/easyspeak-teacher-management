@@ -19,7 +19,7 @@ export const PROGRAMS = [
   "Kids English",
 ] as const;
 export const STUDENT_STATUSES = ["Active", "Inactive", "Completed", "Suspended"] as const;
-export const LESSON_STATUSES = ["Planned", "In Progress", "Completed"] as const;
+export const LESSON_STATUSES = ["Planned", "Complete"] as const;
 export const ATTENDANCE_STATUSES = ["Present", "Late", "Excused", "Absent"] as const;
 export const ASSIGNMENT_TYPES = [
   "Vocabulary Quiz",
