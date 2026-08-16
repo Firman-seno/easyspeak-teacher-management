@@ -138,7 +138,7 @@ export function LessonFormDialog({
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: qk.lessons });
-      toast.success(lesson ? "Material successfully updated." : "Lesson saved successfully.");
+      toast.success(lesson ? "Material successfully updated." : "Material successfully added.");
       onOpenChange(false);
     },
     onError: (e: Error) => {
@@ -148,6 +148,7 @@ export function LessonFormDialog({
   });
 
   const submit = () => {
+    if (mutation.isPending) return;
     const student = students.find((s) => s.id === values.studentId);
     if (student && (!student.program || !student.current_level)) {
       const message =
