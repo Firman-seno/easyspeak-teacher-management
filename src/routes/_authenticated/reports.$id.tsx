@@ -28,7 +28,6 @@ import {
 import { api, qk } from "@/lib/api";
 import {
   ASSESSMENT_SKILLS,
-  MONTHS,
   assessmentScoreKey,
   buildMonthlyAssessment,
   calculateSkillAssessment,
@@ -37,6 +36,10 @@ import {
   formatDate,
   formatDuration,
   formatScore,
+  inDateRange,
+  reportPeriodLong,
+  reportPeriodShort,
+  reportRange,
 } from "@/lib/domain";
 import type { AssessmentSkill, Lesson, MonthlyReport } from "@/lib/domain";
 import { buildReportPdf } from "@/lib/pdf";
@@ -249,33 +252,42 @@ function ReportDetail() {
     [students.data, report],
   );
 
-  const period = useMemo(
-    () => (report ? `${report.year}-${String(report.month).padStart(2, "0")}` : ""),
-    [report],
-  );
+  const periodRange = useMemo(() => (report ? reportRange(report) : null), [report]);
 
   const periodLessons = useMemo(
     () =>
-      (lessons.data ?? []).filter(
-        (l) => l.student_id === report?.student_id && l.date.startsWith(period),
-      ),
-    [lessons.data, report, period],
+      periodRange
+        ? (lessons.data ?? []).filter(
+            (l) =>
+              l.student_id === report?.student_id &&
+              inDateRange(l.date, periodRange.start, periodRange.end),
+          )
+        : [],
+    [lessons.data, report, periodRange],
   );
 
   const periodAssignments = useMemo(
     () =>
-      (assignments.data ?? []).filter(
-        (a) => a.student_id === report?.student_id && a.assigned_date.startsWith(period),
-      ),
-    [assignments.data, report, period],
+      periodRange
+        ? (assignments.data ?? []).filter(
+            (a) =>
+              a.student_id === report?.student_id &&
+              inDateRange(a.assigned_date, periodRange.start, periodRange.end),
+          )
+        : [],
+    [assignments.data, report, periodRange],
   );
 
   const periodProjects = useMemo(
     () =>
-      (projects.data ?? []).filter(
-        (p) => p.student_id === report?.student_id && p.assigned_date.startsWith(period),
-      ),
-    [projects.data, report, period],
+      periodRange
+        ? (projects.data ?? []).filter(
+            (p) =>
+              p.student_id === report?.student_id &&
+              inDateRange(p.assigned_date, periodRange.start, periodRange.end),
+          )
+        : [],
+    [projects.data, report, periodRange],
   );
 
   useEffect(() => {
@@ -316,7 +328,7 @@ function ReportDetail() {
     );
   }
 
-  const periodLabel = `${MONTHS[report.month - 1]} ${report.year}`;
+  const periodLabel = reportPeriodShort(report);
   const schoolName = settings.data?.school_name ?? "EasySpeak Language School";
   const teacherName = settings.data?.teacher_name ?? "Teacher";
 
@@ -330,9 +342,8 @@ function ReportDetail() {
       schoolName,
       teacherName,
     });
-    doc.save(
-      `monthly-report-${student.name.replace(/[^\w\s-]/g, "").replace(/\s+/g, "-")}-${periodLabel.replace(" ", "-")}.pdf`,
-    );
+    const slug = (s: string) => s.replace(/[^\w\s-]/g, "").replace(/\s+/g, "-");
+    doc.save(`progress-report-${slug(student.name)}-${slug(periodLabel)}.pdf`);
   };
 
   return (
@@ -346,7 +357,7 @@ function ReportDetail() {
           </Button>
           <h1 className="mt-2 text-2xl font-semibold text-foreground">{periodLabel} report</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Review, print or download {student.name}&apos;s monthly progress report.
+            Review, print or download {student.name}&apos;s progress report for the selected period.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -370,8 +381,8 @@ function ReportDetail() {
                 <h2 className="mt-1 text-xl font-semibold">Student Progress Report</h2>
               </div>
               <div className="text-right">
-                <p className="text-xs tracking-wide uppercase opacity-80">Reporting period</p>
-                <p className="mt-0.5 text-sm font-medium">{periodLabel}</p>
+                <p className="text-xs tracking-wide uppercase opacity-80">Report period</p>
+                <p className="mt-0.5 text-sm font-medium">{reportPeriodLong(report)}</p>
               </div>
             </div>
           </div>

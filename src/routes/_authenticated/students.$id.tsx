@@ -30,7 +30,6 @@ import {
   useStudents,
 } from "@/hooks/use-data";
 import {
-  MONTHS,
   SKILLS,
   attendanceLabel,
   effectiveAssignmentStatus,
@@ -38,6 +37,7 @@ import {
   formatDate,
   initials,
   projectStats,
+  reportPeriodShort,
   summarizeAttendance,
 } from "@/lib/domain";
 
@@ -527,7 +527,7 @@ function StudentDetail() {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Period</TableHead>
+                      <TableHead>Date Range</TableHead>
                       <TableHead>Attendance</TableHead>
                       <TableHead>Progress</TableHead>
                       <TableHead>Generated</TableHead>
@@ -536,9 +536,7 @@ function StudentDetail() {
                   <TableBody>
                     {data.reports.map((r) => (
                       <TableRow key={r.id}>
-                        <TableCell>
-                          {MONTHS[r.month - 1]} {r.year}
-                        </TableCell>
+                        <TableCell className="whitespace-nowrap">{reportPeriodShort(r)}</TableCell>
                         <TableCell>{r.attendance_rate}%</TableCell>
                         <TableCell>{r.overall_progress}%</TableCell>
                         <TableCell>{formatDate(r.created_at)}</TableCell>

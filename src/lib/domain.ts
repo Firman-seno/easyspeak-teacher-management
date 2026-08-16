@@ -276,11 +276,79 @@ export function projectStats(projects: Pick<Project, "status">[]) {
   };
 }
 
+// Parses a date-only "YYYY-MM-DD" string as a LOCAL date so the displayed
+// day never shifts because of UTC/local timezone conversion. Returns null
+// for anything that is not a plain date string (e.g. full timestamps).
+function parseDateOnly(value: string): Date | null {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  if (!m) return null;
+  return new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+}
+
+// Converts a local Date to a "YYYY-MM-DD" string using local calendar parts,
+// so a picked day never shifts across timezones.
+export function dateToISO(date: Date): string {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+
+export function isoToDate(value?: string | null): Date | undefined {
+  if (!value) return undefined;
+  return parseDateOnly(value) ?? undefined;
+}
+
 export function formatDate(value?: string | null) {
   if (!value) return "—";
-  const d = new Date(value);
+  const d = parseDateOnly(value) ?? new Date(value);
   if (Number.isNaN(d.getTime())) return value;
   return d.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
+}
+
+// Long variant, e.g. "02 August 2026". Used for the report period heading.
+export function formatDateLong(value?: string | null) {
+  if (!value) return "—";
+  const d = parseDateOnly(value) ?? new Date(value);
+  if (Number.isNaN(d.getTime())) return value;
+  return d.toLocaleDateString("en-GB", { day: "2-digit", month: "long", year: "numeric" });
+}
+
+// Inclusive date-only range test. All date columns are stored as "YYYY-MM-DD",
+// so a lexicographic comparison is safe and timezone-independent.
+export function inDateRange(date: string | null | undefined, start: string, end: string): boolean {
+  if (!date) return false;
+  return date >= start && date <= end;
+}
+
+export type ReportPeriodLike = Pick<MonthlyReport, "start_date" | "end_date" | "month" | "year">;
+
+// Effective inclusive [start, end] period of a report. New reports store
+// start_date/end_date directly; legacy reports that only have month/year
+// fall back to their calendar month so they keep working.
+export function reportRange(report: ReportPeriodLike): { start: string; end: string } {
+  if (report.start_date && report.end_date) {
+    return { start: report.start_date, end: report.end_date };
+  }
+  const y = report.year;
+  const m = report.month;
+  const lastDay = new Date(y, m, 0).getDate();
+  return {
+    start: `${y}-${String(m).padStart(2, "0")}-01`,
+    end: `${y}-${String(m).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`,
+  };
+}
+
+// Short label, e.g. "02 Aug 2026 – 16 Aug 2026".
+export function reportPeriodShort(report: ReportPeriodLike): string {
+  const { start, end } = reportRange(report);
+  return `${formatDate(start)} – ${formatDate(end)}`;
+}
+
+// Long label, e.g. "02 August 2026 – 16 August 2026".
+export function reportPeriodLong(report: ReportPeriodLike): string {
+  const { start, end } = reportRange(report);
+  return `${formatDateLong(start)} – ${formatDateLong(end)}`;
 }
 
 export function initials(name: string) {
@@ -293,11 +361,7 @@ export function initials(name: string) {
 }
 
 export function todayISO() {
-  const d = new Date();
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
+  return dateToISO(new Date());
 }
 
 export function effectiveAssignmentStatus(status: string, dueDate?: string | null): string {

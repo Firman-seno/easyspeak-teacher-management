@@ -7,7 +7,7 @@ import { toast } from "sonner";
 import { ConfirmDialog, EmptyState, PageHeader } from "@/components/kit";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
+import { DatePickerField } from "@/components/ui/date-picker";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -36,11 +36,12 @@ import {
 } from "@/hooks/use-data";
 import { api, qk } from "@/lib/api";
 import {
-  MONTHS,
   assessmentScoreKey,
   effectiveAssignmentStatus,
   effectiveProjectStatus,
   formatDate,
+  inDateRange,
+  reportPeriodShort,
   summarizeAttendance,
 } from "@/lib/domain";
 import type { AssessmentSkill, MonthlyAssessment, MonthlyReport } from "@/lib/domain";
@@ -72,10 +73,9 @@ function ReportsPage() {
   const projects = useProjects();
   const progress = useProgress();
 
-  const now = new Date();
   const [studentId, setStudentId] = useState("");
-  const [year, setYear] = useState(String(now.getFullYear()));
-  const [month, setMonth] = useState(String(now.getMonth() + 1));
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
   const [evaluation, setEvaluation] = useState("");
   const [recommendations, setRecommendations] = useState("");
   const [strengths, setStrengths] = useState("");
@@ -95,19 +95,17 @@ function ReportsPage() {
   const generate = useMutation({
     mutationFn: async () => {
       if (!studentId) throw new Error("Select a student first.");
-      const y = Number(year);
-      const m = Number(month);
-      if (!Number.isInteger(y) || y < 2000 || y > 2100)
-        throw new Error("Please enter a valid year (2000–2100).");
+      if (!startDate) throw new Error("Select a start date.");
+      if (!endDate) throw new Error("Select an end date.");
+      if (endDate < startDate) throw new Error("End date cannot be earlier than start date.");
       if (
         (reports.data ?? []).some(
-          (r) => r.student_id === studentId && r.month === m && r.year === y,
+          (r) => r.student_id === studentId && r.start_date === startDate && r.end_date === endDate,
         )
       )
-        throw new Error("A report for this student and month already exists.");
-      const ym = `${y}-${String(m).padStart(2, "0")}`;
+        throw new Error("A report for this student and date range already exists.");
       const attRecords = (attendance.data ?? []).filter(
-        (r) => r.student_id === studentId && r.date.startsWith(ym),
+        (r) => r.student_id === studentId && inDateRange(r.date, startDate, endDate),
       );
       const att = summarizeAttendance(attRecords);
       const prog = (progress.data ?? []).find((p) => p.student_id === studentId);
@@ -125,40 +123,38 @@ function ReportsPage() {
           : {},
       );
 
-      const lessonCount = (lessons.data ?? []).filter(
-        (l) => l.student_id === studentId && l.status === "Completed" && l.date.startsWith(ym),
-      ).length;
-      const lessonsInMonth = (lessons.data ?? []).filter(
-        (l) => l.student_id === studentId && l.date.startsWith(ym),
+      const lessonsInPeriod = (lessons.data ?? []).filter(
+        (l) => l.student_id === studentId && inDateRange(l.date, startDate, endDate),
       );
-      const assignmentsInMonth = (assignments.data ?? []).filter(
-        (a) => a.student_id === studentId && a.assigned_date.startsWith(ym),
+      const assignmentsInPeriod = (assignments.data ?? []).filter(
+        (a) => a.student_id === studentId && inDateRange(a.assigned_date, startDate, endDate),
       );
-      const projectsInMonth = (projects.data ?? []).filter(
-        (p) => p.student_id === studentId && p.assigned_date.startsWith(ym),
+      const projectsInPeriod = (projects.data ?? []).filter(
+        (p) => p.student_id === studentId && inDateRange(p.assigned_date, startDate, endDate),
       );
 
-      const lessonsTotal = lessonsInMonth.length;
-      const lessonsInProgress = lessonsInMonth.filter((l) => l.status === "In Progress").length;
-      const lessonsPlanned = lessonsInMonth.filter((l) => l.status === "Planned").length;
+      const lessonsTotal = lessonsInPeriod.length;
+      const lessonCount = lessonsInPeriod.filter((l) => l.status === "Completed").length;
+      const lessonsInProgress = lessonsInPeriod.filter((l) => l.status === "In Progress").length;
+      const lessonsPlanned = lessonsInPeriod.filter((l) => l.status === "Planned").length;
       const lessonsCompletedPercent = lessonsTotal
         ? Math.round((lessonCount / lessonsTotal) * 100)
         : 0;
 
-      const assignTotal = assignmentsInMonth.length;
-      const assignCompleted = assignmentsInMonth.filter(
+      const assignTotal = assignmentsInPeriod.length;
+      const assignCompleted = assignmentsInPeriod.filter(
         (a) => effectiveAssignmentStatus(a.status, a.due_date) === "Completed",
       ).length;
-      const assignInProgress = assignmentsInMonth.filter(
+      const assignInProgress = assignmentsInPeriod.filter(
         (a) => effectiveAssignmentStatus(a.status, a.due_date) === "In Progress",
       ).length;
-      const assignSubmitted = assignmentsInMonth.filter(
+      const assignSubmitted = assignmentsInPeriod.filter(
         (a) => effectiveAssignmentStatus(a.status, a.due_date) === "Submitted",
       ).length;
-      const assignOverdue = assignmentsInMonth.filter(
+      const assignOverdue = assignmentsInPeriod.filter(
         (a) => effectiveAssignmentStatus(a.status, a.due_date) === "Overdue",
       ).length;
-      const assignScored = assignmentsInMonth.filter((a) => a.score !== null);
+      const assignScored = assignmentsInPeriod.filter((a) => a.score !== null);
       const assignAvgScore = assignScored.length
         ? Math.round(assignScored.reduce((acc, a) => acc + (a.score ?? 0), 0) / assignScored.length)
         : null;
@@ -166,31 +162,31 @@ function ReportsPage() {
         ? Math.round((assignCompleted / assignTotal) * 100)
         : 0;
 
-      const projTotal = projectsInMonth.length;
-      const projCompleted = projectsInMonth.filter(
+      const projTotal = projectsInPeriod.length;
+      const projCompleted = projectsInPeriod.filter(
         (p) => effectiveProjectStatus(p.status, p.due_date) === "Completed",
       ).length;
-      const projInProgress = projectsInMonth.filter(
+      const projInProgress = projectsInPeriod.filter(
         (p) => effectiveProjectStatus(p.status, p.due_date) === "In Progress",
       ).length;
-      const projSubmitted = projectsInMonth.filter(
+      const projSubmitted = projectsInPeriod.filter(
         (p) => effectiveProjectStatus(p.status, p.due_date) === "Submitted",
       ).length;
-      const projOverdue = projectsInMonth.filter(
+      const projOverdue = projectsInPeriod.filter(
         (p) => effectiveProjectStatus(p.status, p.due_date) === "Overdue",
       ).length;
-      const projScored = projectsInMonth.filter((p) => p.score !== null);
+      const projScored = projectsInPeriod.filter((p) => p.score !== null);
       const projAvgScore = projScored.length
         ? Math.round(projScored.reduce((acc, p) => acc + (p.score ?? 0), 0) / projScored.length)
         : null;
       const projCompletionPercent = projTotal ? Math.round((projCompleted / projTotal) * 100) : 0;
 
-      // Monthly Assessment: pull every scored lesson in this month for this
-      // student and pre-fill the computed monthly totals. Final scores and
+      // Monthly Assessment: pull every scored lesson in this date range for
+      // this student and pre-fill the computed totals. Final scores and
       // percentages are recalculated automatically from the lesson scores on
       // the report detail page and persisted when "Save assessment" is used.
       const sumFor = (skill: AssessmentSkill): number | null => {
-        const scored = lessonsInMonth.filter((l) => l[assessmentScoreKey(skill)] != null);
+        const scored = lessonsInPeriod.filter((l) => l[assessmentScoreKey(skill)] != null);
         if (!scored.length) return null;
         return scored.reduce((acc, l) => acc + (l[assessmentScoreKey(skill)] as number), 0);
       };
@@ -205,8 +201,10 @@ function ReportsPage() {
 
       return api.saveReport({
         student_id: studentId,
-        month: m,
-        year: y,
+        month: Number(startDate.slice(5, 7)),
+        year: Number(startDate.slice(0, 4)),
+        start_date: startDate,
+        end_date: endDate,
         total_meetings: att.total,
         present: att.present,
         late: att.late,
@@ -265,8 +263,6 @@ function ReportsPage() {
     onError: () => toast.error("Something went wrong."),
   });
 
-  const currentMonth = `${year}-${String(Number(month)).padStart(2, "0")}`;
-
   return (
     <div className="space-y-6">
       <PageHeader
@@ -297,37 +293,32 @@ function ReportsPage() {
                 </SelectContent>
               </Select>
             </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="month">Month</Label>
-              <Select value={month} onValueChange={setMonth}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {MONTHS.map((m, i) => (
-                    <SelectItem key={m} value={String(i + 1)}>
-                      {m}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="year">Year</Label>
-              <Input
-                id="year"
-                type="number"
-                min={2000}
-                max={2100}
-                value={year}
-                onChange={(e) => setYear(e.target.value)}
-              />
-            </div>
+            <DatePickerField
+              id="start-date"
+              label="Start Date *"
+              value={startDate}
+              onChange={setStartDate}
+              to={endDate || undefined}
+              helper="Select the first day of the report period."
+            />
+            <DatePickerField
+              id="end-date"
+              label="End Date *"
+              value={endDate}
+              onChange={setEndDate}
+              from={startDate || undefined}
+              error={
+                startDate && endDate && endDate < startDate
+                  ? "End date cannot be earlier than start date."
+                  : undefined
+              }
+              helper="Select the last day of the report period."
+            />
             <div className="space-y-1.5">
               <Label>Report data</Label>
               <p className="rounded-md border border-border bg-muted px-3 py-2 text-xs text-muted-foreground">
                 Attendance, lessons, assignments, projects and progress are calculated from the
-                selected month.
+                selected date range.
               </p>
             </div>
           </div>
@@ -338,7 +329,7 @@ function ReportsPage() {
                 id="evaluation"
                 value={evaluation}
                 onChange={(e) => setEvaluation(e.target.value)}
-                placeholder="Brief evaluation of the student's performance this month…"
+                placeholder="Brief evaluation of the student's performance in the selected period…"
                 rows={3}
               />
             </div>
@@ -373,7 +364,16 @@ function ReportsPage() {
               />
             </div>
           </div>
-          <Button onClick={() => generate.mutate()} disabled={generate.isPending || !studentId}>
+          <Button
+            onClick={() => generate.mutate()}
+            disabled={
+              generate.isPending ||
+              !studentId ||
+              !startDate ||
+              !endDate ||
+              (!!startDate && !!endDate && endDate < startDate)
+            }
+          >
             <FileBarChart className="size-4" /> Generate report
           </Button>
         </CardContent>
@@ -399,7 +399,7 @@ function ReportsPage() {
           <CardContent>
             <EmptyState
               title="No reports generated yet."
-              description="Use the form above to create your first monthly report."
+              description="Use the form above to create your first report."
             />
           </CardContent>
         ) : (
@@ -408,7 +408,7 @@ function ReportsPage() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Student</TableHead>
-                  <TableHead>Period</TableHead>
+                  <TableHead>Date Range</TableHead>
                   <TableHead>Attendance</TableHead>
                   <TableHead>Lessons</TableHead>
                   <TableHead>Assignments</TableHead>
@@ -422,9 +422,7 @@ function ReportsPage() {
                 {(reports.data ?? []).map((r) => (
                   <TableRow key={r.id}>
                     <TableCell className="font-medium">{nameOf.get(r.student_id) ?? "—"}</TableCell>
-                    <TableCell className="whitespace-nowrap">
-                      {MONTHS[r.month - 1]} {r.year}
-                    </TableCell>
+                    <TableCell className="whitespace-nowrap">{reportPeriodShort(r)}</TableCell>
                     <TableCell>{r.attendance_rate}%</TableCell>
                     <TableCell>{r.lessons_completed}</TableCell>
                     <TableCell>

@@ -262,6 +262,7 @@ export type Database = {
           assignments_total: number
           attendance_rate: number
           created_at: string
+          end_date: string | null
           excused: number
           id: string
           late: number
@@ -286,6 +287,7 @@ export type Database = {
           projects_total: number
           recommendations: string | null
           skills: Json
+          start_date: string | null
           strengths: string | null
           student_id: string
           teacher_evaluation: string | null
@@ -304,6 +306,7 @@ export type Database = {
           assignments_total?: number
           attendance_rate?: number
           created_at?: string
+          end_date?: string | null
           excused?: number
           id?: string
           late?: number
@@ -328,6 +331,7 @@ export type Database = {
           projects_total?: number
           recommendations?: string | null
           skills?: Json
+          start_date?: string | null
           strengths?: string | null
           student_id: string
           teacher_evaluation?: string | null
@@ -346,6 +350,7 @@ export type Database = {
           assignments_total?: number
           attendance_rate?: number
           created_at?: string
+          end_date?: string | null
           excused?: number
           id?: string
           late?: number
@@ -370,6 +375,7 @@ export type Database = {
           projects_total?: number
           recommendations?: string | null
           skills?: Json
+          start_date?: string | null
           strengths?: string | null
           student_id?: string
           teacher_evaluation?: string | null

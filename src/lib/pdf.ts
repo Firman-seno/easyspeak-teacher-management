@@ -3,7 +3,6 @@ import autoTable from "jspdf-autotable";
 
 import {
   ASSESSMENT_SKILLS,
-  MONTHS,
   SKILLS,
   assessmentScoreKey,
   calculateSkillAssessment,
@@ -12,6 +11,7 @@ import {
   formatDate,
   formatDuration,
   formatScore,
+  reportPeriodLong,
 } from "./domain";
 import type { Assignment, Lesson, MonthlyReport, Project, Student } from "./domain";
 
@@ -41,7 +41,7 @@ export function buildReportPdf({
   const doc = new jsPDF({ unit: "pt", format: "a4" });
   const pageW = doc.internal.pageSize.getWidth();
   const margin = 40;
-  const period = `${MONTHS[report.month - 1]} ${report.year}`;
+  const period = reportPeriodLong(report);
 
   doc.setFillColor(...NAVY);
   doc.rect(0, 0, pageW, 96, "F");
