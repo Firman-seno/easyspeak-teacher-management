@@ -1,10 +1,12 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { GraduationCap } from "lucide-react";
+import { Copy, GraduationCap, Search } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { z } from "zod";
 
 import { StudentCombobox } from "@/components/entity-comboboxes";
+import { ExistingContentDialog } from "@/components/existing-content-dialog";
+import type { ExistingLessonContent } from "@/components/existing-content-dialog";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -83,6 +85,7 @@ export function LessonFormDialog({
   const qc = useQueryClient();
   const [values, setValues] = useState<FormValues>(empty);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [existingOpen, setExistingOpen] = useState(false);
 
   const presetStudent = useMemo(
     () => students.find((s) => s.id === presetStudentId),
@@ -146,6 +149,22 @@ export function LessonFormDialog({
       toast.error(`Failed to save the lesson. ${e.message}`);
     },
   });
+
+  const useExistingContent = (content: ExistingLessonContent) => {
+    setValues((v) => ({
+      ...v,
+      title: content.title,
+      subtitle: content.subtitle,
+      successIndicator: content.successIndicator,
+    }));
+    setErrors((e) => {
+      const next = { ...e };
+      delete next["title"];
+      delete next["subtitle"];
+      delete next["successIndicator"];
+      return next;
+    });
+  };
 
   const submit = () => {
     if (mutation.isPending) return;
@@ -216,112 +235,158 @@ export function LessonFormDialog({
   );
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg">
-        <DialogHeader>
-          <DialogTitle>{lesson ? "Edit Material" : "Add New Material"}</DialogTitle>
-          <DialogDescription>
-            {lesson
-              ? "Update the material details. Changes are saved to the database."
-              : "Create a new lesson or material for a specific student."}
-          </DialogDescription>
-        </DialogHeader>
+    <>
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>{lesson ? "Edit Material" : "Add New Material"}</DialogTitle>
+            <DialogDescription>
+              {lesson
+                ? "Update the material details. Changes are saved to the database."
+                : "Create a new lesson or material for a specific student."}
+            </DialogDescription>
+          </DialogHeader>
 
-        <div className="grid gap-4 sm:grid-cols-2">
-          <div className="space-y-1.5 sm:col-span-2">
-            <Label>Student *</Label>
-            <StudentCombobox
-              students={students}
-              value={values.studentId}
-              onChange={(id) => setValues((v) => ({ ...v, studentId: id }))}
-            />
-            {selectedStudent ? (
-              <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                <GraduationCap className="size-3.5" />
-                {selectedStudent.student_id} • {selectedStudent.program} •{" "}
-                {selectedStudent.current_level}
-              </p>
-            ) : (
-              <p className="text-xs text-muted-foreground">
-                Program and level are filled automatically from the student.
-              </p>
-            )}
-            {errors["studentId"] && (
-              <p className="text-xs text-destructive">{errors["studentId"]}</p>
-            )}
-          </div>
-
-          <div className="sm:col-span-2">{field("title", "Lesson Title *")}</div>
-
-          <div className="sm:col-span-2">
-            {field(
-              "subtitle",
-              "Subtitle",
-              "text",
-              "Optional. Enter a short subtitle, for example: Past simple.",
-            )}
-          </div>
-
-          <div className="space-y-1.5">
-            <Label>Program *</Label>
-            <Input
-              value={selectedStudent?.program ?? ""}
-              readOnly
-              placeholder="Select a student first"
-              className="cursor-default bg-muted/50"
-            />
-            {errors["program"] && <p className="text-xs text-destructive">{errors["program"]}</p>}
-          </div>
-
-          <div className="space-y-1.5">
-            <Label>Level *</Label>
-            <Input
-              value={selectedStudent?.current_level ?? ""}
-              readOnly
-              placeholder="Select a student first"
-              className="cursor-default bg-muted/50"
-            />
-            {errors["level"] && <p className="text-xs text-destructive">{errors["level"]}</p>}
-          </div>
-
-          <div className="sm:col-span-2">
-            {textareaField(
-              "successIndicator",
-              "Success Indicator",
-              "Optional. Describe what the student should be able to do at the end of the lesson, for example: Students are able to use past simple to talk about their weekend.",
-            )}
-          </div>
-
-          <div className="space-y-3 rounded-lg border border-border bg-card p-3 sm:col-span-2">
-            <div>
-              <Label className="text-sm font-semibold">Skill Assessment</Label>
-              <p className="mt-0.5 text-xs text-muted-foreground">
-                Optional. Enter a score from 0 to 100 for each skill. Leave empty for skills that
-                were not assessed in this lesson.
-              </p>
-            </div>
-            <div className="grid gap-3 sm:grid-cols-2">
-              {ASSESSMENT_SKILLS.map((skill) =>
-                scoreField(
-                  `${skill}Score` as keyof FormValues,
-                  ASSESSMENT_LABELS[skill as AssessmentSkill],
-                ),
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-1.5 sm:col-span-2">
+              <Label>Student *</Label>
+              <StudentCombobox
+                students={students}
+                value={values.studentId}
+                onChange={(id) => setValues((v) => ({ ...v, studentId: id }))}
+              />
+              {selectedStudent ? (
+                <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                  <GraduationCap className="size-3.5" />
+                  {selectedStudent.student_id} • {selectedStudent.program} •{" "}
+                  {selectedStudent.current_level}
+                </p>
+              ) : (
+                <p className="text-xs text-muted-foreground">
+                  Program and level are filled automatically from the student.
+                </p>
+              )}
+              {errors["studentId"] && (
+                <p className="text-xs text-destructive">{errors["studentId"]}</p>
               )}
             </div>
+
+            <div className="sm:col-span-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setExistingOpen(true)}
+                className="w-full justify-center gap-2"
+              >
+                <Search className="size-4" /> Use Existing Content
+              </Button>
+              <p className="mt-1 text-center text-xs text-muted-foreground">
+                Reuse the Title, Subtitle and Success Indicator from a lesson you have already
+                created.
+              </p>
+            </div>
+
+            <div className="sm:col-span-2">
+              <div className="flex items-center justify-between gap-2">
+                <Label htmlFor="lesson-title">Lesson Title *</Label>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setExistingOpen(true)}
+                  className="h-6 gap-1 px-2 text-xs text-muted-foreground hover:text-foreground"
+                >
+                  <Copy className="size-3.5" /> Use Existing
+                </Button>
+              </div>
+              <Input
+                id="lesson-title"
+                value={values.title}
+                onChange={(e) => set("title", e.target.value)}
+                placeholder="e.g. Introducing about IELTS"
+              />
+              {errors["title"] && <p className="text-xs text-destructive">{errors["title"]}</p>}
+            </div>
+
+            <div className="sm:col-span-2">
+              {field(
+                "subtitle",
+                "Subtitle",
+                "text",
+                "Optional. Enter a short subtitle, for example: Past simple.",
+              )}
+            </div>
+
+            <div className="space-y-1.5">
+              <Label>Program *</Label>
+              <Input
+                value={selectedStudent?.program ?? ""}
+                readOnly
+                placeholder="Select a student first"
+                className="cursor-default bg-muted/50"
+              />
+              {errors["program"] && <p className="text-xs text-destructive">{errors["program"]}</p>}
+            </div>
+
+            <div className="space-y-1.5">
+              <Label>Level *</Label>
+              <Input
+                value={selectedStudent?.current_level ?? ""}
+                readOnly
+                placeholder="Select a student first"
+                className="cursor-default bg-muted/50"
+              />
+              {errors["level"] && <p className="text-xs text-destructive">{errors["level"]}</p>}
+            </div>
+
+            <div className="sm:col-span-2">
+              {textareaField(
+                "successIndicator",
+                "Success Indicator",
+                "Optional. Describe what the student should be able to do at the end of the lesson, for example: Students are able to use past simple to talk about their weekend.",
+              )}
+            </div>
+
+            <div className="space-y-3 rounded-lg border border-border bg-card p-3 sm:col-span-2">
+              <div>
+                <Label className="text-sm font-semibold">Skill Assessment</Label>
+                <p className="mt-0.5 text-xs text-muted-foreground">
+                  Optional. Enter a score from 0 to 100 for each skill. Leave empty for skills that
+                  were not assessed in this lesson.
+                </p>
+              </div>
+              <div className="grid gap-3 sm:grid-cols-2">
+                {ASSESSMENT_SKILLS.map((skill) =>
+                  scoreField(
+                    `${skill}Score` as keyof FormValues,
+                    ASSESSMENT_LABELS[skill as AssessmentSkill],
+                  ),
+                )}
+              </div>
+            </div>
+
+            <div className="sm:col-span-2">{field("date", "Date *", "date")}</div>
           </div>
 
-          <div className="sm:col-span-2">{field("date", "Date *", "date")}</div>
-        </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => onOpenChange(false)}>
+              Cancel
+            </Button>
+            <Button onClick={submit} disabled={mutation.isPending}>
+              {mutation.isPending ? "Saving..." : lesson ? "Save changes" : "Add Material"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
-        <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
-            Cancel
-          </Button>
-          <Button onClick={submit} disabled={mutation.isPending}>
-            {mutation.isPending ? "Saving..." : lesson ? "Save changes" : "Add Material"}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+      <ExistingContentDialog
+        open={existingOpen}
+        onOpenChange={setExistingOpen}
+        program={selectedStudent?.program ?? null}
+        level={selectedStudent?.current_level ?? null}
+        excludeLessonId={lesson?.id ?? null}
+        onUseContent={useExistingContent}
+      />
+    </>
   );
 }

@@ -15,6 +15,8 @@ import type { Tables } from "@/integrations/supabase/types";
 
 type SettingsRow = Tables<"settings">;
 
+export type LessonWithStudent = Lesson & { students: { name: string } | null };
+
 function unwrap<T>({ data, error }: { data: T | null; error: { message: string } | null }): T {
   if (error) throw new Error(error.message);
   return data as T;
@@ -80,6 +82,34 @@ export const api = {
   async deleteLesson(id: string) {
     const { error } = await supabase.from("lessons").delete().eq("id", id);
     if (error) throw new Error(error.message);
+  },
+  async searchLessons(params: {
+    q?: string;
+    program?: string;
+    level?: string;
+    limit?: number;
+    excludeLessonId?: string;
+  }): Promise<LessonWithStudent[]> {
+    let builder = supabase.from("lessons").select("*, students(name)");
+    if (params.excludeLessonId) builder = builder.neq("id", params.excludeLessonId);
+    if (params.program) builder = builder.eq("program", params.program);
+    if (params.level) builder = builder.eq("level", params.level);
+    const q = params.q?.trim();
+    if (q) {
+      // Values are wrapped in double quotes so commas, dots and parentheses in
+      // the search text cannot break the PostgREST `or()` filter grammar.
+      // Double quotes and backslashes are stripped for the same reason.
+      const value = q.replace(/["\\]/g, " ");
+      const pattern = `"*${value}*"`;
+      builder = builder.or(
+        `title.ilike.${pattern},subtitle.ilike.${pattern},success_indicator.ilike.${pattern}`,
+      );
+    }
+    const { data, error } = await builder
+      .order("date", { ascending: false })
+      .limit(params.limit ?? 20);
+    if (error) throw new Error(error.message);
+    return (data ?? []) as unknown as LessonWithStudent[];
   },
 
   async assignments(): Promise<Assignment[]> {
