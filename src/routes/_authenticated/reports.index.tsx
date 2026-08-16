@@ -186,10 +186,10 @@ function ReportsPage() {
         : null;
       const projCompletionPercent = projTotal ? Math.round((projCompleted / projTotal) * 100) : 0;
 
-      // Skill Assessment: pull every scored lesson in this month for this
-      // student and pre-fill the "Monthly Total" with the plain sum.
-      // Final scores and percentages are left null — the teacher decides
-      // those manually (never auto-computed).
+      // Monthly Assessment: pull every scored lesson in this month for this
+      // student and pre-fill the computed monthly totals. Final scores and
+      // percentages are recalculated automatically from the lesson scores on
+      // the report detail page and persisted when "Save assessment" is used.
       const sumFor = (skill: AssessmentSkill): number | null => {
         const scored = lessonsInMonth.filter((l) => l[assessmentScoreKey(skill)] != null);
         if (!scored.length) return null;

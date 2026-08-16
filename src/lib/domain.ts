@@ -72,7 +72,7 @@ export const SKILLS = [
 export type Skill = (typeof SKILLS)[number];
 
 // The 5 skills used by Lessons/Materials assessments and the
-// Monthly Reports Skill Analysis. Grammar is intentionally absent.
+// Monthly Reports assessment. Grammar is intentionally absent.
 export const ASSESSMENT_SKILLS = [
   "speaking",
   "listening",
@@ -138,6 +138,55 @@ export function parseMonthlyAssessment(value: Json | null): MonthlyAssessment | 
       monthly_score: o ? numberOrNull(o["monthly_score"]) : null,
       percentage: o ? numberOrNull(o["percentage"]) : null,
     },
+  };
+}
+
+export type SkillAssessmentCalculation = {
+  total: number;
+  final_score: number;
+  percentage: number;
+  assessedCount: number;
+};
+
+// Computes the automatic monthly totals / final score / percentage for a
+// skill from its lesson scores. NULL or missing scores are treated as
+// "Not Assessed" and are never counted as 0. Returns null when no score
+// exists at all.
+export function calculateSkillAssessment(
+  scores: Array<number | null | undefined>,
+): SkillAssessmentCalculation | null {
+  const assessed = scores.filter((s): s is number => typeof s === "number");
+  if (assessed.length === 0) return null;
+  const total = assessed.reduce((a, b) => a + b, 0);
+  const final_score = total / assessed.length;
+  return { total, final_score, percentage: final_score, assessedCount: assessed.length };
+}
+
+// Formats a score while preserving meaningful decimals (e.g. 70, 70.5, 73.33).
+export function formatScore(value: number): string {
+  const rounded = Math.round(value * 100) / 100;
+  return rounded.toFixed(2).replace(/\.?0+$/, "");
+}
+
+// Builds the monthly_assessment JSON for a report from the month's lesson
+// scores. Final score / percentage equal the average because scores already
+// use the 0-100 scale.
+export function buildMonthlyAssessment(lessons: Lesson[]): MonthlyAssessment {
+  const row = (key: AssessmentScoreKey): SkillAssessmentValue => {
+    const calc = calculateSkillAssessment(lessons.map((l) => l[key]));
+    return {
+      total: calc ? calc.total : null,
+      final_score: calc ? calc.final_score : null,
+      percentage: calc ? calc.percentage : null,
+    };
+  };
+  return {
+    speaking: row("speaking_score"),
+    listening: row("listening_score"),
+    reading: row("reading_score"),
+    writing: row("writing_score"),
+    vocabulary: row("vocabulary_score"),
+    overall: { monthly_score: null, percentage: null },
   };
 }
 

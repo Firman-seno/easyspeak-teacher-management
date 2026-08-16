@@ -5,10 +5,12 @@ import {
   ASSESSMENT_SKILLS,
   MONTHS,
   SKILLS,
+  assessmentScoreKey,
+  calculateSkillAssessment,
   effectiveAssignmentStatus,
   effectiveProjectStatus,
   formatDate,
-  parseMonthlyAssessment,
+  formatScore,
 } from "./domain";
 import type { Assignment, Lesson, MonthlyReport, Project, Student } from "./domain";
 
@@ -153,51 +155,18 @@ export function buildReportPdf({
     ],
   );
 
-  const assessment = parseMonthlyAssessment(report.monthly_assessment);
-  const legacySkills = (report.skills ?? {}) as Record<string, number>;
-  const skillPercent = (skill: string): number | null => {
-    if (assessment) {
-      const v = assessment[skill as keyof typeof assessment];
-      return v && typeof v === "object" && !Array.isArray(v) && typeof v.percentage === "number"
-        ? v.percentage
-        : null;
-    }
-    const legacy = legacySkills[skill];
-    return typeof legacy === "number" ? legacy : null;
-  };
-  const overallPercent = assessment ? assessment.overall.percentage : report.overall_progress;
-
-  section("Skill Analysis");
-  const skillRows: (string | number)[][] = [];
-  for (const skill of ASSESSMENT_SKILLS) {
-    const pct = skillPercent(skill);
-    skillRows.push([
-      skill.charAt(0).toUpperCase() + skill.slice(1),
-      pct != null ? `${pct}%` : "Not Assessed",
-    ]);
-  }
+  section("Monthly Assessment");
   table(
-    ["Skill", "Score", "Skill", "Score"],
-    [
-      [
-        skillRows[0]?.[0] ?? "",
-        skillRows[0]?.[1] ?? "",
-        skillRows[1]?.[0] ?? "",
-        skillRows[1]?.[1] ?? "",
-      ],
-      [
-        skillRows[2]?.[0] ?? "",
-        skillRows[2]?.[1] ?? "",
-        skillRows[3]?.[0] ?? "",
-        skillRows[3]?.[1] ?? "",
-      ],
-      [
-        skillRows[4]?.[0] ?? "",
-        skillRows[4]?.[1] ?? "",
-        "Overall Progress",
-        overallPercent != null ? `${overallPercent}%` : "Not Assessed",
-      ],
-    ],
+    ["Skill", "Monthly Total", "Final Score", "Percentage"],
+    ASSESSMENT_SKILLS.map((skill) => {
+      const calc = calculateSkillAssessment(lessons.map((l) => l[assessmentScoreKey(skill)]));
+      return [
+        skill.charAt(0).toUpperCase() + skill.slice(1),
+        calc ? formatScore(calc.total) : "0",
+        calc ? formatScore(calc.final_score) : "Not Assessed",
+        calc ? `${formatScore(calc.percentage)}%` : "Not Assessed",
+      ];
+    }),
   );
 
   if (lessons.length) {
