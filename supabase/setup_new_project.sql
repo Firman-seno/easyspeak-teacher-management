@@ -63,13 +63,14 @@ CREATE TABLE public.attendance (
   check_in_time text,
   meeting text,
   notes text,
+  lesson_id uuid,
   created_at timestamptz NOT NULL DEFAULT now()
 );
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.attendance TO authenticated;
 GRANT ALL ON public.attendance TO service_role;
 ALTER TABLE public.attendance ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "attendance_all" ON public.attendance FOR ALL TO authenticated USING (true) WITH CHECK (true);
-CREATE UNIQUE INDEX attendance_unique ON public.attendance(student_id, date);
+CREATE UNIQUE INDEX IF NOT EXISTS attendance_lesson_id_unique ON public.attendance (lesson_id) WHERE lesson_id IS NOT NULL;
 
 CREATE TABLE public.lessons (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -86,6 +87,13 @@ CREATE TABLE public.lessons (
   homework text,
   notes text,
   duration int,
+  subtitle text,
+  success_indicator text,
+  speaking_score int,
+  listening_score int,
+  reading_score int,
+  writing_score int,
+  vocabulary_score int,
   created_at timestamptz NOT NULL DEFAULT now()
 );
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.lessons TO authenticated;
@@ -270,6 +278,12 @@ ALTER TABLE public.lessons
   ADD COLUMN IF NOT EXISTS updated_at timestamptz NOT NULL DEFAULT now();
 
 CREATE INDEX IF NOT EXISTS lessons_student_id_idx ON public.lessons(student_id);
+ALTER TABLE public.lessons ADD CONSTRAINT lessons_duration_check CHECK (duration IS NULL OR duration > 0);
+ALTER TABLE public.lessons ADD CONSTRAINT lessons_speaking_score_check CHECK (speaking_score IS NULL OR (speaking_score >= 0 AND speaking_score <= 100));
+ALTER TABLE public.lessons ADD CONSTRAINT lessons_listening_score_check CHECK (listening_score IS NULL OR (listening_score >= 0 AND listening_score <= 100));
+ALTER TABLE public.lessons ADD CONSTRAINT lessons_reading_score_check CHECK (reading_score IS NULL OR (reading_score >= 0 AND reading_score <= 100));
+ALTER TABLE public.lessons ADD CONSTRAINT lessons_writing_score_check CHECK (writing_score IS NULL OR (writing_score >= 0 AND writing_score <= 100));
+ALTER TABLE public.lessons ADD CONSTRAINT lessons_vocabulary_score_check CHECK (vocabulary_score IS NULL OR (vocabulary_score >= 0 AND vocabulary_score <= 100));
 DROP TRIGGER IF EXISTS lessons_updated ON public.lessons;
 CREATE TRIGGER lessons_updated BEFORE UPDATE ON public.lessons FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
 
@@ -288,6 +302,15 @@ UPDATE public.projects SET status = 'Planned' WHERE status = 'Assigned';
 CREATE INDEX IF NOT EXISTS projects_student_id_idx ON public.projects(student_id);
 DROP TRIGGER IF EXISTS projects_updated ON public.projects;
 CREATE TRIGGER projects_updated BEFORE UPDATE ON public.projects FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
+
+-- attendance: add FK to lessons now that the lessons table exists.
+ALTER TABLE public.attendance
+  ADD CONSTRAINT attendance_lesson_id_fkey
+  FOREIGN KEY (lesson_id) REFERENCES public.lessons(id) ON DELETE CASCADE;
+
+-- Remove the old unique constraint on (student_id, date) to allow
+-- the same student to have multiple lessons on the same date.
+ALTER TABLE public.attendance DROP CONSTRAINT IF EXISTS attendance_student_id_date_key;
 
 CREATE TABLE IF NOT EXISTS public.assignments (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -336,6 +359,13 @@ ALTER TABLE public.monthly_reports
   ADD COLUMN IF NOT EXISTS projects_overdue int NOT NULL DEFAULT 0,
   ADD COLUMN IF NOT EXISTS projects_avg_score int,
   ADD COLUMN IF NOT EXISTS projects_completion_percent int NOT NULL DEFAULT 0;
+
+ALTER TABLE public.monthly_reports
+  ADD COLUMN IF NOT EXISTS monthly_assessment jsonb;
+
+ALTER TABLE public.monthly_reports
+  ADD CONSTRAINT monthly_reports_date_range_check
+  CHECK (start_date IS NULL OR end_date IS NULL OR end_date >= start_date);
 
 -- Force PostgREST to reload its schema cache so the API sees new columns.
 NOTIFY pgrst, 'reload schema';

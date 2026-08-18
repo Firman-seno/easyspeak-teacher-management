@@ -17,3 +17,6 @@ CREATE UNIQUE INDEX IF NOT EXISTS attendance_lesson_id_unique ON attendance (les
 -- 4. Remove the old unique constraint on (student_id, date) to allow
 --    the same student to have multiple lessons (and attendance) on the same date.
 ALTER TABLE attendance DROP CONSTRAINT IF EXISTS attendance_student_id_date_key;
+
+-- 5. Force PostgREST to reload its schema cache so the API sees the new column.
+NOTIFY pgrst, 'reload schema';

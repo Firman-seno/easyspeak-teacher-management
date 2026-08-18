@@ -61,7 +61,7 @@ const schema = z.object({
     .min(1, "Please choose a date.")
     .regex(/^\d{4}-\d{2}-\d{2}$/, "Please choose a valid date."),
   meeting: z.string().trim().max(50),
-  attendanceStatus: z.string().min(1, "Please select an attendance status."),
+  attendanceStatus: z.string(),
   attendanceTime: z.string(),
 });
 
@@ -88,8 +88,8 @@ const empty: FormValues = {
   vocabularyScore: "",
   date: todayISO(),
   meeting: "",
-  attendanceStatus: "Present",
-  attendanceTime: "09:00",
+  attendanceStatus: "",
+  attendanceTime: "",
 };
 
 export function LessonFormDialog({
@@ -138,8 +138,8 @@ export function LessonFormDialog({
         vocabularyScore: lesson.vocabulary_score != null ? String(lesson.vocabulary_score) : "",
         date: lesson.date.slice(0, 10),
         meeting: existingAttendance?.meeting ?? "",
-        attendanceStatus: existingAttendance?.status ?? "Present",
-        attendanceTime: existingAttendance?.check_in_time ?? "09:00",
+        attendanceStatus: existingAttendance?.status ?? "",
+        attendanceTime: existingAttendance?.check_in_time ?? "",
       });
     } else if (presetStudent) {
       setValues({ ...empty, studentId: presetStudent.id });
@@ -183,7 +183,7 @@ export function LessonFormDialog({
 
       const hasAttendance =
         payload.meeting.trim() !== "" ||
-        payload.attendanceStatus !== "Present" ||
+        payload.attendanceStatus !== "" ||
         payload.attendanceTime !== "";
 
       if (hasAttendance) {
@@ -193,7 +193,7 @@ export function LessonFormDialog({
           payload.date,
           {
             meeting: payload.meeting.trim() || null,
-            status: payload.attendanceStatus,
+            status: payload.attendanceStatus || "Present",
             check_in_time: payload.attendanceTime || null,
           },
         );
