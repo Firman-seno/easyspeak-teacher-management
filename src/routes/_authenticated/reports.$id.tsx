@@ -666,16 +666,28 @@ function ReportDetail() {
               </p>
             </section>
 
-            <section className="flex flex-wrap items-end justify-between gap-6 pt-4">
-              <div className="border-t border-border pt-2">
-                <p className="text-sm font-semibold text-foreground">{teacherName}</p>
-                <p className="text-xs text-muted-foreground">Teacher signature</p>
-              </div>
-              <div className="border-t border-border pt-2 text-right">
-                <p className="text-sm font-medium text-foreground">
-                  {formatDate(report.created_at)}
-                </p>
-                <p className="text-xs text-muted-foreground">Date issued</p>
+            <section className="report-signature mt-8 pt-6">
+              <div className="flex flex-wrap items-end justify-between gap-6">
+                <div>
+                  <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
+                    Teacher&apos;s Signature
+                  </p>
+                  <div className="mt-12 border-t border-border pt-2">
+                    <p className="text-sm font-semibold text-foreground">{teacherName}</p>
+                    <p className="text-xs text-muted-foreground">Teacher</p>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
+                    Date
+                  </p>
+                  <div className="mt-12 border-t border-border pt-2">
+                    <p className="text-sm font-medium text-foreground">
+                      {formatDate(report.created_at)}
+                    </p>
+                    <p className="text-xs text-muted-foreground">Date issued</p>
+                  </div>
+                </div>
               </div>
             </section>
           </div>

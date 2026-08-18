@@ -230,23 +230,41 @@ export function buildReportPdf({
   paragraph("Teacher's Evaluation", report.teacher_evaluation ?? "");
   paragraph("Recommendations", report.recommendations ?? "");
 
-  if (y > 640) {
+  // ── Signature section ──────────────────────────────────────────
+  // The signature block needs ~120 pt of vertical room: gap +
+  // separator line + teacher name + role label + comfortable
+  // white-space for a hand-written signature.
+  const SIGNATURE_HEIGHT = 120;
+  const PAGE_H = doc.internal.pageSize.getHeight();
+
+  if (y + SIGNATURE_HEIGHT > PAGE_H - margin) {
     doc.addPage();
     y = 80;
   }
-  const footerY = Math.max(y + 30, 700);
+
+  // Draw a separator line.
+  const sigLineY = y + 30;
   doc.setDrawColor(200, 206, 218);
   doc.setLineWidth(0.7);
-  doc.line(margin, footerY, margin + 170, footerY);
+  doc.line(margin, sigLineY, margin + 170, sigLineY);
+
+  // Teacher name (bold).
   doc.setTextColor(...NAVY);
   doc.setFont("helvetica", "bold");
   doc.setFontSize(10);
-  doc.text(teacherName, margin, footerY + 16);
+  doc.text(teacherName, margin, sigLineY + 20);
+
+  // Role label (normal).
   doc.setFont("helvetica", "normal");
   doc.setFontSize(9);
   doc.setTextColor(...GRAY);
-  doc.text("Teacher Signature", margin, footerY + 30);
-  doc.text(`Date: ${formatDate(new Date().toISOString())}`, pageW - margin, footerY + 16, {
+  doc.text("Teacher", margin, sigLineY + 34);
+
+  // Date (right-aligned).
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(9);
+  doc.setTextColor(...GRAY);
+  doc.text(`Date: ${formatDate(new Date().toISOString())}`, pageW - margin, sigLineY + 20, {
     align: "right",
   });
 

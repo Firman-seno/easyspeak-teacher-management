@@ -247,4 +247,8 @@
   .shadow-soft {
     box-shadow: none !important;
   }
+  .report-signature {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
 }
