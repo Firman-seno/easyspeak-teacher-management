@@ -11,8 +11,11 @@ ALTER TABLE attendance
   ADD CONSTRAINT attendance_lesson_id_fkey
   FOREIGN KEY (lesson_id) REFERENCES lessons(id) ON DELETE CASCADE;
 
--- 3. Create unique index: one attendance record per lesson
-CREATE UNIQUE INDEX IF NOT EXISTS attendance_lesson_id_unique ON attendance (lesson_id) WHERE lesson_id IS NOT NULL;
+-- 3. Create UNIQUE CONSTRAINT on lesson_id (required for Supabase ON CONFLICT upsert).
+--    PostgreSQL allows multiple NULLs in a UNIQUE column, so old attendance
+--    records without lesson_id are preserved.
+ALTER TABLE attendance
+  ADD CONSTRAINT attendance_lesson_id_key UNIQUE (lesson_id);
 
 -- 4. Remove the old unique constraint on (student_id, date) to allow
 --    the same student to have multiple lessons (and attendance) on the same date.

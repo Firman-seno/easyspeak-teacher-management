@@ -63,14 +63,13 @@ CREATE TABLE public.attendance (
   check_in_time text,
   meeting text,
   notes text,
-  lesson_id uuid,
+  lesson_id uuid UNIQUE,
   created_at timestamptz NOT NULL DEFAULT now()
 );
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.attendance TO authenticated;
 GRANT ALL ON public.attendance TO service_role;
 ALTER TABLE public.attendance ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "attendance_all" ON public.attendance FOR ALL TO authenticated USING (true) WITH CHECK (true);
-CREATE UNIQUE INDEX IF NOT EXISTS attendance_lesson_id_unique ON public.attendance (lesson_id) WHERE lesson_id IS NOT NULL;
 
 CREATE TABLE public.lessons (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),

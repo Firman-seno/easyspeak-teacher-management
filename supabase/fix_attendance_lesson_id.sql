@@ -28,9 +28,22 @@ BEGIN
   END IF;
 END $$;
 
--- 3) Create partial unique index: at most one attendance per lesson
-CREATE UNIQUE INDEX IF NOT EXISTS attendance_lesson_id_unique
-  ON public.attendance (lesson_id) WHERE lesson_id IS NOT NULL;
+-- 3) Create UNIQUE CONSTRAINT on lesson_id (required for ON CONFLICT upsert)
+--    PostgreSQL allows multiple NULLs in a UNIQUE column, so old attendance
+--    records without lesson_id are preserved.
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint
+    WHERE conname = 'attendance_lesson_id_key'
+  ) THEN
+    ALTER TABLE public.attendance
+      ADD CONSTRAINT attendance_lesson_id_key UNIQUE (lesson_id);
+  END IF;
+END $$;
+
+-- 3b) Drop the old partial unique index (PostgreSQL ON CONFLICT cannot use partial indexes)
+DROP INDEX IF EXISTS public.attendance_lesson_id_unique;
 
 -- 4) Drop old unique constraint on (student_id, date) if it exists
 ALTER TABLE public.attendance DROP CONSTRAINT IF EXISTS attendance_student_id_date_key;
