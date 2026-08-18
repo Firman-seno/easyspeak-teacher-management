@@ -1,21 +1,23 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { Eye, FileBarChart, Printer, Sparkles, Trash2 } from "lucide-react";
+import { Check, ChevronsUpDown, Eye, FileBarChart, Printer, Sparkles, Trash2, UserRound } from "lucide-react";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 
 import { ConfirmDialog, EmptyState, PageHeader } from "@/components/kit";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
 import { DatePickerField } from "@/components/ui/date-picker";
 import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Textarea } from "@/components/ui/textarea";
 import {
   Table,
@@ -45,6 +47,7 @@ import {
   summarizeAttendance,
 } from "@/lib/domain";
 import type { AssessmentSkill, MonthlyAssessment, MonthlyReport } from "@/lib/domain";
+import { cn } from "@/lib/utils";
 import { skillsFromProgress } from "@/lib/pdf";
 
 export const Route = createFileRoute("/_authenticated/reports/")({
@@ -74,6 +77,7 @@ function ReportsPage() {
   const progress = useProgress();
 
   const [studentId, setStudentId] = useState("");
+  const [studentOpen, setStudentOpen] = useState(false);
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [evaluation, setEvaluation] = useState("");
@@ -280,18 +284,63 @@ function ReportsPage() {
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
             <div className="space-y-1.5">
               <Label>Student *</Label>
-              <Select value={studentId} onValueChange={setStudentId}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select student" />
-                </SelectTrigger>
-                <SelectContent>
-                  {active.map((s) => (
-                    <SelectItem key={s.id} value={s.id}>
-                      {s.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Popover open={studentOpen} onOpenChange={setStudentOpen}>
+                <PopoverTrigger asChild>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    role="combobox"
+                    aria-expanded={studentOpen}
+                    className="w-full justify-between font-normal"
+                  >
+                    {studentId ? (
+                      <span className="flex min-w-0 items-center gap-2 truncate">
+                        <UserRound className="size-4 shrink-0 text-muted-foreground" />
+                        <span className="truncate">
+                          {nameOf.get(studentId) ?? "—"}
+                        </span>
+                      </span>
+                    ) : (
+                      <span className="flex items-center gap-2 text-muted-foreground">
+                        <UserRound className="size-4 shrink-0" />
+                        Select student
+                      </span>
+                    )}
+                    <ChevronsUpDown className="ml-2 size-4 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent
+                  className="w-[min(90vw,var(--radix-popover-trigger-width))] p-0"
+                  align="start"
+                >
+                  <Command>
+                    <CommandInput placeholder="Search student..." />
+                    <CommandList>
+                      <CommandEmpty>No student found.</CommandEmpty>
+                      <CommandGroup>
+                        {active.map((s) => (
+                          <CommandItem
+                            key={s.id}
+                            value={s.name}
+                            onSelect={() => {
+                              setStudentId(s.id);
+                              setStudentOpen(false);
+                            }}
+                          >
+                            <Check
+                              className={cn(
+                                "mr-2 size-4",
+                                studentId === s.id ? "opacity-100" : "opacity-0",
+                              )}
+                            />
+                            <span className="truncate">{s.name}</span>
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
             </div>
             <DatePickerField
               id="start-date"
