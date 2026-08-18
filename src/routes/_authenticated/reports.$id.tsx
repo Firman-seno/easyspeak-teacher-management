@@ -330,7 +330,7 @@ function ReportDetail() {
 
   const periodLabel = reportPeriodShort(report);
   const schoolName = settings.data?.school_name ?? "EasySpeak Language School";
-  const teacherName = settings.data?.teacher_name ?? "Teacher";
+  const teacherName = student?.teacher?.trim() || "Not Assigned";
 
   const downloadPdf = () => {
     const doc = buildReportPdf({
