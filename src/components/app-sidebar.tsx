@@ -1,7 +1,6 @@
 import { Link, useRouterState } from "@tanstack/react-router";
 import {
   BookOpen,
-  CalendarCheck,
   ClipboardList,
   FileBarChart,
   FolderKanban,
@@ -30,7 +29,6 @@ import {
 const items = [
   { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
   { title: "Students", url: "/students", icon: Users },
-  { title: "Attendance", url: "/attendance", icon: CalendarCheck },
   { title: "Lessons / Materials", url: "/lessons", icon: BookOpen },
   { title: "Assignments", url: "/assignments", icon: ClipboardList },
   { title: "Projects", url: "/projects", icon: FolderKanban },
@@ -89,7 +87,7 @@ export function AppSidebar() {
       </SidebarContent>
       {!collapsed && (
         <SidebarFooter className="px-4 py-3 text-[11px] leading-relaxed text-sidebar-foreground/50">
-          Attendance • Progress • Projects • Reports
+          Lessons • Progress • Projects • Reports
         </SidebarFooter>
       )}
     </Sidebar>

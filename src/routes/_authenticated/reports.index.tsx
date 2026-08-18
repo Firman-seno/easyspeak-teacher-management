@@ -109,9 +109,26 @@ function ReportsPage() {
       )
         throw new Error("A report for this student and date range already exists.");
       const attRecords = (attendance.data ?? []).filter(
-        (r) => r.student_id === studentId && inDateRange(r.date, startDate, endDate),
+        (r) =>
+          r.student_id === studentId &&
+          inDateRange(r.date, startDate, endDate) &&
+          !r.lesson_id,
       );
-      const att = summarizeAttendance(attRecords);
+      const lessonsInPeriod = (lessons.data ?? []).filter(
+        (l) => l.student_id === studentId && inDateRange(l.date, startDate, endDate),
+      );
+      const lessonsWithAtt = lessonsInPeriod.filter((l) =>
+        (attendance.data ?? []).some((a) => a.lesson_id === l.id),
+      );
+      const lessonsWithoutAtt = lessonsInPeriod.filter(
+        (l) => !(attendance.data ?? []).some((a) => a.lesson_id === l.id),
+      );
+      const lessonAttRecords = lessonsWithAtt.map((l) => {
+        const att = (attendance.data ?? []).find((a) => a.lesson_id === l.id)!;
+        return { ...att, date: l.date };
+      });
+      const allAttRecords = [...attRecords, ...lessonAttRecords];
+      const att = summarizeAttendance(allAttRecords);
       const prog = (progress.data ?? []).find((p) => p.student_id === studentId);
       const student = (students.data ?? []).find((s) => s.id === studentId);
       const skills = skillsFromProgress(
@@ -127,9 +144,6 @@ function ReportsPage() {
           : {},
       );
 
-      const lessonsInPeriod = (lessons.data ?? []).filter(
-        (l) => l.student_id === studentId && inDateRange(l.date, startDate, endDate),
-      );
       const assignmentsInPeriod = (assignments.data ?? []).filter(
         (a) => a.student_id === studentId && inDateRange(a.assigned_date, startDate, endDate),
       );

@@ -9,11 +9,13 @@ import {
   Pencil,
   UserRound,
 } from "lucide-react";
+import { useMemo } from "react";
 import type { ReactNode } from "react";
 
 import { StatusBadge, statusTone } from "@/components/kit";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
+import { useAttendance } from "@/hooks/use-data";
 import { ASSESSMENT_SKILLS, formatDate, formatDuration } from "@/lib/domain";
 import type { AssessmentSkill, Lesson, Student } from "@/lib/domain";
 
@@ -62,6 +64,12 @@ export function LessonDetailSheet({
   student?: Student | undefined;
   onEdit?: (lesson: Lesson) => void;
 }) {
+  const attendance = useAttendance();
+  const existingAttendance = useMemo(
+    () => (lesson ? (attendance.data ?? []).find((a) => a.lesson_id === lesson.id) ?? null : null),
+    [attendance.data, lesson],
+  );
+
   const hasAssessment = lesson
     ? !ASSESSMENT_SKILLS.every((s) => lesson[`${s}_score`] == null)
     : false;
@@ -120,6 +128,38 @@ export function LessonDetailSheet({
                 value={formatDuration(lesson?.duration) ?? undefined}
               />
             </div>
+
+            {existingAttendance && (
+              <div className="rounded-xl border border-border bg-muted/40 px-4 py-3">
+                <p className="flex items-center gap-1.5 text-xs font-medium tracking-wide text-muted-foreground uppercase">
+                  <ClipboardCheck className="size-4" /> Attendance
+                </p>
+                <div className="mt-2 grid grid-cols-3 gap-3 text-sm">
+                  <div>
+                    <p className="text-xs text-muted-foreground">Meeting</p>
+                    <p className="font-medium">{existingAttendance.meeting ?? "—"}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">Status</p>
+                    <StatusBadge tone={statusTone(existingAttendance.status)}>
+                      {existingAttendance.status}
+                    </StatusBadge>
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">Time</p>
+                    <p className="font-medium">{existingAttendance.check_in_time ?? "—"}</p>
+                  </div>
+                </div>
+              </div>
+            )}
+            {!existingAttendance && lesson && (
+              <div className="rounded-xl border border-dashed border-border bg-muted/20 px-4 py-3">
+                <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
+                  Attendance
+                </p>
+                <p className="mt-1 text-sm text-muted-foreground">Not recorded</p>
+              </div>
+            )}
 
             {lesson?.success_indicator && (
               <div className="rounded-xl border border-emerald-200/70 bg-emerald-50 px-4 py-3">

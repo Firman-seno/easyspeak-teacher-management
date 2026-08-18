@@ -17,6 +17,10 @@ type SettingsRow = Tables<"settings">;
 
 export type LessonWithStudent = Lesson & { students: { name: string } | null };
 
+export type AttendanceWithLesson = Attendance & {
+  lessons: { title: string; date: string; student_id: string | null } | null;
+};
+
 function unwrap<T>({ data, error }: { data: T | null; error: { message: string } | null }): T {
   if (error) throw new Error(error.message);
   return data as T;
@@ -55,9 +59,10 @@ export const api = {
     );
   },
   async upsertAttendance(rows: TablesInsert<"attendance">[]) {
+    if (!rows.length) return;
     const { error } = await supabase
       .from("attendance")
-      .upsert(rows, { onConflict: "student_id,date" });
+      .upsert(rows, { onConflict: "lesson_id" });
     if (error) throw new Error(error.message);
   },
   async updateAttendance(id: string, values: TablesUpdate<"attendance">) {
@@ -66,6 +71,38 @@ export const api = {
   },
   async deleteAttendance(id: string) {
     const { error } = await supabase.from("attendance").delete().eq("id", id);
+    if (error) throw new Error(error.message);
+  },
+
+  async attendanceWithLesson(): Promise<AttendanceWithLesson[]> {
+    return unwrap(
+      await supabase
+        .from("attendance")
+        .select("*, lessons!attendance_lesson_id_fkey(title, date, student_id)")
+        .order("date", { ascending: false })
+        .limit(2000),
+    );
+  },
+
+  async upsertAttendanceForLesson(
+    lessonId: string,
+    studentId: string,
+    date: string,
+    values: { meeting?: string | null; status?: string; check_in_time?: string | null },
+  ) {
+    const { error } = await supabase
+      .from("attendance")
+      .upsert(
+        {
+          lesson_id: lessonId,
+          student_id: studentId,
+          date,
+          meeting: values.meeting ?? null,
+          status: values.status ?? "Present",
+          check_in_time: values.check_in_time ?? null,
+        },
+        { onConflict: "lesson_id" },
+      );
     if (error) throw new Error(error.message);
   },
 

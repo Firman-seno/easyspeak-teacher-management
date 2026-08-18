@@ -83,9 +83,14 @@ function StudentDetail() {
     const assign = (assignments.data ?? []).filter((a) => a.student_id === id);
     const prog = (progress.data ?? []).find((p) => p.student_id === id);
     const covered = (lessons.data ?? []).filter((l) => l.student_id === id);
+    const lessonTitleMap = new Map((lessons.data ?? []).map((l) => [l.id, l.title]));
+    const recordsWithLesson = records.map((r) => ({
+      ...r,
+      lessonTitle: r.lesson_id ? (lessonTitleMap.get(r.lesson_id) ?? null) : null,
+    }));
     return {
       att: summarizeAttendance(records),
-      records,
+      records: recordsWithLesson,
       proj,
       assign,
       stats: projectStats(proj),
@@ -243,9 +248,9 @@ function StudentDetail() {
                     <TableRow>
                       <TableHead>Date</TableHead>
                       <TableHead>Meeting</TableHead>
+                      <TableHead>Lesson</TableHead>
                       <TableHead>Status</TableHead>
                       <TableHead>Time</TableHead>
-                      <TableHead>Notes</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -253,11 +258,13 @@ function StudentDetail() {
                       <TableRow key={r.id}>
                         <TableCell>{formatDate(r.date)}</TableCell>
                         <TableCell>{r.meeting ?? "—"}</TableCell>
+                        <TableCell className="max-w-[200px] truncate">
+                          {r.lessonTitle ?? "—"}
+                        </TableCell>
                         <TableCell>
                           <StatusBadge tone={statusTone(r.status)}>{r.status}</StatusBadge>
                         </TableCell>
                         <TableCell>{r.check_in_time ?? "—"}</TableCell>
-                        <TableCell className="max-w-[240px] truncate">{r.notes ?? "—"}</TableCell>
                       </TableRow>
                     ))}
                   </TableBody>

@@ -92,6 +92,7 @@ export type Database = {
           created_at: string
           date: string
           id: string
+          lesson_id: string | null
           meeting: string | null
           notes: string | null
           status: string
@@ -102,6 +103,7 @@ export type Database = {
           created_at?: string
           date: string
           id?: string
+          lesson_id?: string | null
           meeting?: string | null
           notes?: string | null
           status?: string
@@ -112,12 +114,20 @@ export type Database = {
           created_at?: string
           date?: string
           id?: string
+          lesson_id?: string | null
           meeting?: string | null
           notes?: string | null
           status?: string
           student_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "attendance_lesson_id_fkey"
+            columns: ["lesson_id"]
+            isOneToOne: false
+            referencedRelation: "lessons"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "attendance_student_id_fkey"
             columns: ["student_id"]

@@ -33,6 +33,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   useAssignments,
   useAttendance,
+  useLessons,
   useProgress,
   useProjects,
   useStudents,
@@ -80,6 +81,7 @@ const CHART_COLORS = [
 function Dashboard() {
   const students = useStudents();
   const attendance = useAttendance();
+  const lessons = useLessons();
   const assignments = useAssignments();
   const projects = useProjects();
   const progress = useProgress();
@@ -87,7 +89,17 @@ function Dashboard() {
   const data = useMemo(() => {
     const all = students.data ?? [];
     const active = all.filter((s) => s.status === "Active");
-    const records = attendance.data ?? [];
+    const legacyRecords = (attendance.data ?? []).filter((r) => !r.lesson_id);
+    const lessonsData = lessons.data ?? [];
+    const lessonAttRecords = lessonsData
+      .filter((l) => l.student_id && l.date)
+      .map((l) => {
+        const att = (attendance.data ?? []).find((a) => a.lesson_id === l.id);
+        if (!att) return null;
+        return { ...att, date: l.date };
+      })
+      .filter((r): r is NonNullable<typeof r> => r !== null);
+    const records = [...legacyRecords, ...lessonAttRecords];
     const today = todayISO();
     const month = today.slice(0, 7);
     const monthRecords = records.filter((r) => r.date.startsWith(month));
@@ -171,7 +183,7 @@ function Dashboard() {
       assignmentSeries,
       projectSeries,
     };
-  }, [students.data, attendance.data, assignments.data, projects.data, progress.data]);
+  }, [students.data, attendance.data, lessons.data, assignments.data, projects.data, progress.data]);
 
   return (
     <div className="space-y-6">
@@ -186,7 +198,7 @@ function Dashboard() {
               </Link>
             </Button>
             <Button asChild variant="outline" className="min-h-12 justify-center sm:min-h-9">
-              <Link to="/attendance">
+              <Link to="/lessons">
                 <CalendarCheck className="size-4" /> Record Attendance
               </Link>
             </Button>

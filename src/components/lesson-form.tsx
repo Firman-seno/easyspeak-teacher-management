@@ -18,9 +18,17 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { useAttendance } from "@/hooks/use-data";
 import { api, qk } from "@/lib/api";
-import { ASSESSMENT_SKILLS, todayISO } from "@/lib/domain";
+import { ASSESSMENT_SKILLS, ATTENDANCE_STATUSES, todayISO } from "@/lib/domain";
 import type { AssessmentSkill, Lesson, Student } from "@/lib/domain";
 
 const scoreSchema = z
@@ -52,6 +60,9 @@ const schema = z.object({
     .string()
     .min(1, "Please choose a date.")
     .regex(/^\d{4}-\d{2}-\d{2}$/, "Please choose a valid date."),
+  meeting: z.string().trim().max(50),
+  attendanceStatus: z.string().min(1, "Please select an attendance status."),
+  attendanceTime: z.string(),
 });
 
 type FormValues = z.infer<typeof schema>;
@@ -76,6 +87,9 @@ const empty: FormValues = {
   writingScore: "",
   vocabularyScore: "",
   date: todayISO(),
+  meeting: "",
+  attendanceStatus: "Present",
+  attendanceTime: "09:00",
 };
 
 export function LessonFormDialog({
@@ -95,11 +109,17 @@ export function LessonFormDialog({
   const [values, setValues] = useState<FormValues>(empty);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [existingOpen, setExistingOpen] = useState(false);
+  const attendance = useAttendance();
 
   const presetStudent = useMemo(
     () => students.find((s) => s.id === presetStudentId),
     [students, presetStudentId],
   );
+
+  const existingAttendance = useMemo(() => {
+    if (!lesson) return null;
+    return (attendance.data ?? []).find((a) => a.lesson_id === lesson.id) ?? null;
+  }, [attendance.data, lesson]);
 
   useEffect(() => {
     if (!open) return;
@@ -117,13 +137,16 @@ export function LessonFormDialog({
         writingScore: lesson.writing_score != null ? String(lesson.writing_score) : "",
         vocabularyScore: lesson.vocabulary_score != null ? String(lesson.vocabulary_score) : "",
         date: lesson.date.slice(0, 10),
+        meeting: existingAttendance?.meeting ?? "",
+        attendanceStatus: existingAttendance?.status ?? "Present",
+        attendanceTime: existingAttendance?.check_in_time ?? "09:00",
       });
     } else if (presetStudent) {
       setValues({ ...empty, studentId: presetStudent.id });
     } else {
       setValues(empty);
     }
-  }, [open, lesson, presetStudent]);
+  }, [open, lesson, presetStudent, existingAttendance]);
 
   const selectedStudent = students.find((s) => s.id === values.studentId);
 
@@ -132,7 +155,7 @@ export function LessonFormDialog({
   const mutation = useMutation({
     mutationFn: async (payload: FormValues) => {
       const student = students.find((s) => s.id === payload.studentId);
-      const data = {
+      const lessonData = {
         student_id: payload.studentId,
         title: payload.title.trim(),
         subtitle: payload.subtitle.trim() || null,
@@ -147,11 +170,38 @@ export function LessonFormDialog({
         vocabulary_score: payload.vocabularyScore === "" ? null : Number(payload.vocabularyScore),
         date: payload.date,
       };
-      if (lesson) await api.updateLesson(lesson.id, data);
-      else await api.createLesson(data);
+
+      let lessonId: string;
+
+      if (lesson) {
+        await api.updateLesson(lesson.id, lessonData);
+        lessonId = lesson.id;
+      } else {
+        const created = await api.createLesson(lessonData);
+        lessonId = created.id;
+      }
+
+      const hasAttendance =
+        payload.meeting.trim() !== "" ||
+        payload.attendanceStatus !== "Present" ||
+        payload.attendanceTime !== "";
+
+      if (hasAttendance) {
+        await api.upsertAttendanceForLesson(
+          lessonId,
+          payload.studentId,
+          payload.date,
+          {
+            meeting: payload.meeting.trim() || null,
+            status: payload.attendanceStatus,
+            check_in_time: payload.attendanceTime || null,
+          },
+        );
+      }
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: qk.lessons });
+      qc.invalidateQueries({ queryKey: qk.attendance });
       toast.success(lesson ? "Material successfully updated." : "Material successfully added.");
       onOpenChange(false);
     },
@@ -397,6 +447,57 @@ export function LessonFormDialog({
             </div>
 
             <div className="space-y-1.5">{field("date", "Date *", "date")}</div>
+
+            <div className="space-y-3 rounded-lg border border-border bg-card p-3 sm:col-span-2">
+              <div>
+                <Label className="text-sm font-semibold">Attendance</Label>
+                <p className="mt-0.5 text-xs text-muted-foreground">
+                  Optional. Record attendance for this lesson. Student, program and level are
+                  automatically linked from the lesson data.
+                </p>
+              </div>
+              <div className="grid gap-3 sm:grid-cols-3">
+                <div className="space-y-1.5">
+                  <Label htmlFor="lesson-meeting">Meeting</Label>
+                  <Input
+                    id="lesson-meeting"
+                    value={values.meeting}
+                    onChange={(e) => set("meeting", e.target.value)}
+                    placeholder="e.g. Meeting 1"
+                  />
+                  {errors["meeting"] && (
+                    <p className="text-xs text-destructive">{errors["meeting"]}</p>
+                  )}
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="lesson-attendance-status">Status</Label>
+                  <Select
+                    value={values.attendanceStatus}
+                    onValueChange={(v) => set("attendanceStatus", v)}
+                  >
+                    <SelectTrigger id="lesson-attendance-status">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {ATTENDANCE_STATUSES.map((s) => (
+                        <SelectItem key={s} value={s}>
+                          {s}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="lesson-attendance-time">Time</Label>
+                  <Input
+                    id="lesson-attendance-time"
+                    type="time"
+                    value={values.attendanceTime}
+                    onChange={(e) => set("attendanceTime", e.target.value)}
+                  />
+                </div>
+              </div>
+            </div>
           </div>
 
           <DialogFooter>

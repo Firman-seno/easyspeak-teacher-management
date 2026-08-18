@@ -6,22 +6,32 @@ import {
   CalendarDays,
   CheckCircle2,
   ClipboardCheck,
+  Clock,
   GraduationCap,
   Link2,
   Pencil,
   Trash2,
   UserRound,
 } from "lucide-react";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { toast } from "sonner";
 
 import { ConfirmDialog, EmptyState, StatusBadge, statusTone } from "@/components/kit";
 import { LessonFormDialog } from "@/components/lesson-form";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { useLessons, useStudents } from "@/hooks/use-data";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { useAttendance, useLessons, useStudents } from "@/hooks/use-data";
 import { api, qk } from "@/lib/api";
-import { ASSESSMENT_SKILLS, formatDate } from "@/lib/domain";
+import { ASSESSMENT_SKILLS, ATTENDANCE_STATUSES, formatDate } from "@/lib/domain";
 import type { AssessmentSkill } from "@/lib/domain";
 
 const ASSESSMENT_LABELS: Record<AssessmentSkill, string> = {
@@ -67,16 +77,44 @@ function LessonDetail() {
   const navigate = useNavigate();
   const lessons = useLessons();
   const students = useStudents();
+  const attendance = useAttendance();
   const [editOpen, setEditOpen] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
+
+  const existingAttendance = useMemo(
+    () => (attendance.data ?? []).find((a) => a.lesson_id === id) ?? null,
+    [attendance.data, id],
+  );
+
+  const [attMeeting, setAttMeeting] = useState("");
+  const [attStatus, setAttStatus] = useState("Present");
+  const [attTime, setAttTime] = useState("09:00");
 
   const remove = useMutation({
     mutationFn: (lessonId: string) => api.deleteLesson(lessonId),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: qk.lessons });
+      qc.invalidateQueries({ queryKey: qk.attendance });
       toast.success("Material successfully deleted.");
       setConfirmDelete(false);
       navigate({ to: "/lessons" });
+    },
+    onError: () => toast.error("Something went wrong."),
+  });
+
+  const saveAttendance = useMutation({
+    mutationFn: async () => {
+      const lesson = (lessons.data ?? []).find((l) => l.id === id);
+      if (!lesson || !lesson.student_id) throw new Error("Lesson or student not found");
+      await api.upsertAttendanceForLesson(lesson.id, lesson.student_id, lesson.date, {
+        meeting: attMeeting.trim() || null,
+        status: attStatus,
+        check_in_time: attTime || null,
+      });
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: qk.attendance });
+      toast.success("Attendance successfully saved.");
     },
     onError: () => toast.error("Something went wrong."),
   });
@@ -187,6 +225,109 @@ function LessonDetail() {
           <p className="mt-1.5 text-sm text-emerald-900">{lesson.success_indicator}</p>
         </div>
       )}
+
+      <Card className="shadow-soft">
+        <CardHeader className="pb-2">
+          <CardTitle className="text-base flex items-center gap-2">
+            <Clock className="size-4" /> Attendance
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {existingAttendance ? (
+            <div className="space-y-3">
+              <div className="grid gap-3 sm:grid-cols-3">
+                <div className="space-y-1.5">
+                  <Label>Meeting</Label>
+                  <Input
+                    value={attMeeting || (existingAttendance.meeting ?? "")}
+                    onChange={(e) => setAttMeeting(e.target.value)}
+                    placeholder="e.g. Meeting 1"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Status</Label>
+                  <Select
+                    value={attStatus || existingAttendance.status}
+                    onValueChange={setAttStatus}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {ATTENDANCE_STATUSES.map((s) => (
+                        <SelectItem key={s} value={s}>
+                          {s}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Time</Label>
+                  <Input
+                    type="time"
+                    value={attTime || (existingAttendance.check_in_time ?? "09:00")}
+                    onChange={(e) => setAttTime(e.target.value)}
+                  />
+                </div>
+              </div>
+              <Button
+                onClick={() => saveAttendance.mutate()}
+                disabled={saveAttendance.isPending}
+                size="sm"
+              >
+                Update Attendance
+              </Button>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              <p className="text-sm text-muted-foreground">
+                Attendance has not been recorded for this lesson.
+              </p>
+              <div className="grid gap-3 sm:grid-cols-3">
+                <div className="space-y-1.5">
+                  <Label>Meeting</Label>
+                  <Input
+                    value={attMeeting}
+                    onChange={(e) => setAttMeeting(e.target.value)}
+                    placeholder="e.g. Meeting 1"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Status</Label>
+                  <Select value={attStatus} onValueChange={setAttStatus}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {ATTENDANCE_STATUSES.map((s) => (
+                        <SelectItem key={s} value={s}>
+                          {s}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Time</Label>
+                  <Input
+                    type="time"
+                    value={attTime}
+                    onChange={(e) => setAttTime(e.target.value)}
+                  />
+                </div>
+              </div>
+              <Button
+                onClick={() => saveAttendance.mutate()}
+                disabled={saveAttendance.isPending}
+                size="sm"
+              >
+                Mark Attendance
+              </Button>
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       <div className="rounded-xl border border-border bg-card p-4">
         <p className="flex items-center gap-1.5 text-xs font-medium tracking-wide text-muted-foreground uppercase">
