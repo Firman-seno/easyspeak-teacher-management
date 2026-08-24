@@ -28,15 +28,8 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { useAttendance } from "@/hooks/use-data";
 import { api, qk } from "@/lib/api";
-import { ASSESSMENT_SKILLS, ATTENDANCE_STATUSES, todayISO } from "@/lib/domain";
-import type { AssessmentSkill, Lesson, Student } from "@/lib/domain";
-
-const scoreSchema = z
-  .string()
-  .refine(
-    (v) => v === "" || (/^\d{1,3}$/.test(v) && Number(v) >= 0 && Number(v) <= 100),
-    "Score must be a number between 0 and 100.",
-  );
+import { ATTENDANCE_STATUSES, todayISO } from "@/lib/domain";
+import type { Lesson, Student } from "@/lib/domain";
 
 const durationSchema = z
   .string()
@@ -51,11 +44,6 @@ const schema = z.object({
   subtitle: z.string().trim().max(200),
   successIndicator: z.string().trim().max(1000),
   duration: durationSchema,
-  speakingScore: scoreSchema,
-  listeningScore: scoreSchema,
-  readingScore: scoreSchema,
-  writingScore: scoreSchema,
-  vocabularyScore: scoreSchema,
   date: z
     .string()
     .min(1, "Please choose a date.")
@@ -67,25 +55,12 @@ const schema = z.object({
 
 type FormValues = z.infer<typeof schema>;
 
-const ASSESSMENT_LABELS: Record<AssessmentSkill, string> = {
-  speaking: "Speaking",
-  listening: "Listening",
-  reading: "Reading",
-  writing: "Writing",
-  vocabulary: "Vocabulary",
-};
-
 const empty: FormValues = {
   studentId: "",
   title: "",
   subtitle: "",
   successIndicator: "",
   duration: "",
-  speakingScore: "",
-  listeningScore: "",
-  readingScore: "",
-  writingScore: "",
-  vocabularyScore: "",
   date: todayISO(),
   meeting: "",
   attendanceStatus: "",
@@ -131,11 +106,6 @@ export function LessonFormDialog({
         subtitle: lesson.subtitle ?? "",
         successIndicator: lesson.success_indicator ?? "",
         duration: lesson.duration != null ? String(lesson.duration) : "",
-        speakingScore: lesson.speaking_score != null ? String(lesson.speaking_score) : "",
-        listeningScore: lesson.listening_score != null ? String(lesson.listening_score) : "",
-        readingScore: lesson.reading_score != null ? String(lesson.reading_score) : "",
-        writingScore: lesson.writing_score != null ? String(lesson.writing_score) : "",
-        vocabularyScore: lesson.vocabulary_score != null ? String(lesson.vocabulary_score) : "",
         date: lesson.date.slice(0, 10),
         meeting: existingAttendance?.meeting ?? "",
         attendanceStatus: existingAttendance?.status ?? "",
@@ -163,11 +133,6 @@ export function LessonFormDialog({
         level: student?.current_level ?? null,
         success_indicator: payload.successIndicator.trim() || null,
         duration: payload.duration === "" ? null : Number(payload.duration),
-        speaking_score: payload.speakingScore === "" ? null : Number(payload.speakingScore),
-        listening_score: payload.listeningScore === "" ? null : Number(payload.listeningScore),
-        reading_score: payload.readingScore === "" ? null : Number(payload.readingScore),
-        writing_score: payload.writingScore === "" ? null : Number(payload.writingScore),
-        vocabulary_score: payload.vocabularyScore === "" ? null : Number(payload.vocabularyScore),
         date: payload.date,
       };
 
@@ -187,16 +152,11 @@ export function LessonFormDialog({
         payload.attendanceTime !== "";
 
       if (hasAttendance) {
-        await api.upsertAttendanceForLesson(
-          lessonId,
-          payload.studentId,
-          payload.date,
-          {
-            meeting: payload.meeting.trim() || null,
-            status: payload.attendanceStatus || "Present",
-            check_in_time: payload.attendanceTime || null,
-          },
-        );
+        await api.upsertAttendanceForLesson(lessonId, payload.studentId, payload.date, {
+          meeting: payload.meeting.trim() || null,
+          status: payload.attendanceStatus || "Present",
+          check_in_time: payload.attendanceTime || null,
+        });
       }
     },
     onSuccess: () => {
@@ -275,23 +235,6 @@ export function LessonFormDialog({
         onChange={(e) => set(key, e.target.value)}
       />
       {helper && <p className="text-xs text-muted-foreground">{helper}</p>}
-      {errors[key] && <p className="text-xs text-destructive">{errors[key]}</p>}
-    </div>
-  );
-
-  const scoreField = (key: keyof FormValues, label: string) => (
-    <div className="space-y-1.5">
-      <Label htmlFor={`lesson-${key}`}>{label}</Label>
-      <Input
-        id={`lesson-${key}`}
-        type="number"
-        min={0}
-        max={100}
-        inputMode="numeric"
-        placeholder="—"
-        value={values[key]}
-        onChange={(e) => set(key, e.target.value)}
-      />
       {errors[key] && <p className="text-xs text-destructive">{errors[key]}</p>}
     </div>
   );
@@ -407,24 +350,6 @@ export function LessonFormDialog({
                 "Success Indicator",
                 "Optional. Describe what the student should be able to do at the end of the lesson, for example: Students are able to use past simple to talk about their weekend.",
               )}
-            </div>
-
-            <div className="space-y-3 rounded-lg border border-border bg-card p-3 sm:col-span-2">
-              <div>
-                <Label className="text-sm font-semibold">Skill Assessment</Label>
-                <p className="mt-0.5 text-xs text-muted-foreground">
-                  Optional. Enter a score from 0 to 100 for each skill. Leave empty for skills that
-                  were not assessed in this lesson.
-                </p>
-              </div>
-              <div className="grid gap-3 sm:grid-cols-2">
-                {ASSESSMENT_SKILLS.map((skill) =>
-                  scoreField(
-                    `${skill}Score` as keyof FormValues,
-                    ASSESSMENT_LABELS[skill as AssessmentSkill],
-                  ),
-                )}
-              </div>
             </div>
 
             <div className="space-y-1.5">

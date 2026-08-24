@@ -16,6 +16,7 @@ import { toast } from "sonner";
 
 import { ConfirmDialog, EmptyState, PageHeader, statusTone, toneClass } from "@/components/kit";
 import { LessonDetailSheet } from "@/components/lesson-detail";
+import { StudentCombobox } from "@/components/entity-comboboxes";
 import { LessonFormDialog } from "@/components/lesson-form";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -201,19 +202,15 @@ function LessonsPage() {
               className="pl-9"
             />
           </div>
-          <Select value={studentId} onValueChange={setStudentId}>
-            <SelectTrigger>
-              <SelectValue placeholder="Student" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Students</SelectItem>
-              {studentOptions.map((s) => (
-                <SelectItem key={s.id} value={s.id}>
-                  {s.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <StudentCombobox
+            students={studentOptions}
+            value={studentId}
+            onChange={(id) => setStudentId(id)}
+            allOption={{ label: "All Students", value: "all" }}
+            triggerPlaceholder="Student"
+            searchPlaceholder="Search student…"
+            emptyText="No students found"
+          />
           <Select value={level} onValueChange={setLevel}>
             <SelectTrigger>
               <SelectValue placeholder="Level" />

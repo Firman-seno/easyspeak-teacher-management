@@ -22,6 +22,7 @@ export function StudentCombobox({
   allOption,
   triggerPlaceholder = "Search student…",
   searchPlaceholder = "Search student by name…",
+  emptyText = "No student found.",
 }: {
   students: Student[];
   value: string;
@@ -30,6 +31,7 @@ export function StudentCombobox({
   allOption?: { label: string; value: string };
   triggerPlaceholder?: string;
   searchPlaceholder?: string;
+  emptyText?: string;
 }) {
   const [open, setOpen] = useState(false);
   const selected = students.find((s) => s.id === value);
@@ -76,7 +78,7 @@ export function StudentCombobox({
         <Command>
           <CommandInput placeholder={searchPlaceholder} />
           <CommandList>
-            <CommandEmpty>No student found.</CommandEmpty>
+            <CommandEmpty>{emptyText}</CommandEmpty>
             {allOption ? (
               <CommandGroup>
                 <CommandItem
