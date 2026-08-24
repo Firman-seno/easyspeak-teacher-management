@@ -2,15 +2,11 @@ import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 
 import {
-  ASSESSMENT_SKILLS,
   SKILLS,
-  assessmentScoreKey,
-  calculateSkillAssessment,
   effectiveAssignmentStatus,
   effectiveProjectStatus,
   formatDate,
   formatDuration,
-  formatScore,
   reportPeriodLong,
 } from "./domain";
 import type { Assignment, Lesson, MonthlyReport, Project, Student } from "./domain";
@@ -154,20 +150,6 @@ export function buildReportPdf({
         `${report.projects_completion_percent}%`,
       ],
     ],
-  );
-
-  section("Monthly Assessment");
-  table(
-    ["Skill", "Monthly Total", "Final Score", "Percentage"],
-    ASSESSMENT_SKILLS.map((skill) => {
-      const calc = calculateSkillAssessment(lessons.map((l) => l[assessmentScoreKey(skill)]));
-      return [
-        skill.charAt(0).toUpperCase() + skill.slice(1),
-        calc ? formatScore(calc.total) : "0",
-        calc ? formatScore(calc.final_score) : "Not Assessed",
-        calc ? `${formatScore(calc.percentage)}%` : "Not Assessed",
-      ];
-    }),
   );
 
   if (lessons.length) {

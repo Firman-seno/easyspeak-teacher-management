@@ -1,4 +1,4 @@
-import type { Json, Tables } from "@/integrations/supabase/types";
+import type { Tables } from "@/integrations/supabase/types";
 
 export type Student = Tables<"students">;
 export type Attendance = Tables<"attendance">;
@@ -112,8 +112,8 @@ export const SKILLS = [
 ] as const;
 export type Skill = (typeof SKILLS)[number];
 
-// The 5 skills used by Lessons/Materials assessments and the
-// Monthly Reports assessment. Grammar is intentionally absent.
+// The 5 skills used by Lessons/Materials assessments.
+// Grammar is intentionally absent.
 export const ASSESSMENT_SKILLS = [
   "speaking",
   "listening",
@@ -122,92 +122,6 @@ export const ASSESSMENT_SKILLS = [
   "vocabulary",
 ] as const;
 export type AssessmentSkill = (typeof ASSESSMENT_SKILLS)[number];
-export type AssessmentScoreKey = `${AssessmentSkill}_score`;
-
-export type SkillAssessmentValue = {
-  total: number | null;
-  final_score: number | null;
-  percentage: number | null;
-};
-
-export type MonthlyAssessment = {
-  speaking: SkillAssessmentValue;
-  listening: SkillAssessmentValue;
-  reading: SkillAssessmentValue;
-  writing: SkillAssessmentValue;
-  vocabulary: SkillAssessmentValue;
-  overall: { monthly_score: number | null; percentage: number | null };
-};
-
-export function assessmentScoreKey(skill: AssessmentSkill): AssessmentScoreKey {
-  return `${skill}_score`;
-}
-
-function numberOrNull(value: unknown): number | null {
-  return typeof value === "number" ? value : null;
-}
-
-// Reads the manual monthly assessment JSON stored on monthly_reports.
-// Returns null for legacy reports that predate the Skill Assessment feature.
-export function parseMonthlyAssessment(value: Json | null): MonthlyAssessment | null {
-  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
-  const v = value as Record<string, unknown>;
-  const pick = (key: string): SkillAssessmentValue => {
-    const s = v[key];
-    if (!s || typeof s !== "object" || Array.isArray(s)) {
-      return { total: null, final_score: null, percentage: null };
-    }
-    const r = s as Record<string, unknown>;
-    return {
-      total: numberOrNull(r["total"]),
-      final_score: numberOrNull(r["final_score"]),
-      percentage: numberOrNull(r["percentage"]),
-    };
-  };
-  const overall = v["overall"];
-  const o =
-    overall && typeof overall === "object" && !Array.isArray(overall)
-      ? (overall as Record<string, unknown>)
-      : undefined;
-  return {
-    speaking: pick("speaking"),
-    listening: pick("listening"),
-    reading: pick("reading"),
-    writing: pick("writing"),
-    vocabulary: pick("vocabulary"),
-    overall: {
-      monthly_score: o ? numberOrNull(o["monthly_score"]) : null,
-      percentage: o ? numberOrNull(o["percentage"]) : null,
-    },
-  };
-}
-
-export type SkillAssessmentCalculation = {
-  total: number;
-  final_score: number;
-  percentage: number;
-  assessedCount: number;
-};
-
-// Computes the automatic monthly totals / final score / percentage for a
-// skill from its lesson scores. NULL or missing scores are treated as
-// "Not Assessed" and are never counted as 0. Returns null when no score
-// exists at all.
-export function calculateSkillAssessment(
-  scores: Array<number | null | undefined>,
-): SkillAssessmentCalculation | null {
-  const assessed = scores.filter((s): s is number => typeof s === "number");
-  if (assessed.length === 0) return null;
-  const total = assessed.reduce((a, b) => a + b, 0);
-  const final_score = total / assessed.length;
-  return { total, final_score, percentage: final_score, assessedCount: assessed.length };
-}
-
-// Formats a score while preserving meaningful decimals (e.g. 70, 70.5, 73.33).
-export function formatScore(value: number): string {
-  const rounded = Math.round(value * 100) / 100;
-  return rounded.toFixed(2).replace(/\.?0+$/, "");
-}
 
 // Formats a lesson duration in minutes into a human-friendly label.
 // Returns null when the duration is missing (NULL) or not a positive
@@ -221,28 +135,6 @@ export function formatDuration(minutes: number | null | undefined): string | nul
   const hourLabel = `${hours} hour${hours === 1 ? "" : "s"}`;
   if (mins === 0) return hourLabel;
   return `${hourLabel} ${mins} minute${mins === 1 ? "" : "s"}`;
-}
-
-// Builds the monthly_assessment JSON for a report from the month's lesson
-// scores. Final score / percentage equal the average because scores already
-// use the 0-100 scale.
-export function buildMonthlyAssessment(lessons: Lesson[]): MonthlyAssessment {
-  const row = (key: AssessmentScoreKey): SkillAssessmentValue => {
-    const calc = calculateSkillAssessment(lessons.map((l) => l[key]));
-    return {
-      total: calc ? calc.total : null,
-      final_score: calc ? calc.final_score : null,
-      percentage: calc ? calc.percentage : null,
-    };
-  };
-  return {
-    speaking: row("speaking_score"),
-    listening: row("listening_score"),
-    reading: row("reading_score"),
-    writing: row("writing_score"),
-    vocabulary: row("vocabulary_score"),
-    overall: { monthly_score: null, percentage: null },
-  };
 }
 
 export const MONTHS = [

@@ -1,6 +1,15 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { Check, ChevronsUpDown, Eye, FileBarChart, Printer, Sparkles, Trash2, UserRound } from "lucide-react";
+import {
+  Check,
+  ChevronsUpDown,
+  Eye,
+  FileBarChart,
+  Printer,
+  Sparkles,
+  Trash2,
+  UserRound,
+} from "lucide-react";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 
@@ -38,7 +47,6 @@ import {
 } from "@/hooks/use-data";
 import { api, qk } from "@/lib/api";
 import {
-  assessmentScoreKey,
   effectiveAssignmentStatus,
   effectiveProjectStatus,
   formatDate,
@@ -46,7 +54,7 @@ import {
   reportPeriodShort,
   summarizeAttendance,
 } from "@/lib/domain";
-import type { AssessmentSkill, MonthlyAssessment, MonthlyReport } from "@/lib/domain";
+import type { MonthlyReport } from "@/lib/domain";
 import { cn } from "@/lib/utils";
 import { skillsFromProgress } from "@/lib/pdf";
 
@@ -110,9 +118,7 @@ function ReportsPage() {
         throw new Error("A report for this student and date range already exists.");
       const attRecords = (attendance.data ?? []).filter(
         (r) =>
-          r.student_id === studentId &&
-          inDateRange(r.date, startDate, endDate) &&
-          !r.lesson_id,
+          r.student_id === studentId && inDateRange(r.date, startDate, endDate) && !r.lesson_id,
       );
       const lessonsInPeriod = (lessons.data ?? []).filter(
         (l) => l.student_id === studentId && inDateRange(l.date, startDate, endDate),
@@ -199,24 +205,6 @@ function ReportsPage() {
         : null;
       const projCompletionPercent = projTotal ? Math.round((projCompleted / projTotal) * 100) : 0;
 
-      // Monthly Assessment: pull every scored lesson in this date range for
-      // this student and pre-fill the computed totals. Final scores and
-      // percentages are recalculated automatically from the lesson scores on
-      // the report detail page and persisted when "Save assessment" is used.
-      const sumFor = (skill: AssessmentSkill): number | null => {
-        const scored = lessonsInPeriod.filter((l) => l[assessmentScoreKey(skill)] != null);
-        if (!scored.length) return null;
-        return scored.reduce((acc, l) => acc + (l[assessmentScoreKey(skill)] as number), 0);
-      };
-      const monthlyAssessment: MonthlyAssessment = {
-        speaking: { total: sumFor("speaking"), final_score: null, percentage: null },
-        listening: { total: sumFor("listening"), final_score: null, percentage: null },
-        reading: { total: sumFor("reading"), final_score: null, percentage: null },
-        writing: { total: sumFor("writing"), final_score: null, percentage: null },
-        vocabulary: { total: sumFor("vocabulary"), final_score: null, percentage: null },
-        overall: { monthly_score: null, percentage: null },
-      };
-
       return api.saveReport({
         student_id: studentId,
         month: Number(startDate.slice(5, 7)),
@@ -251,7 +239,6 @@ function ReportsPage() {
         projects_completion_percent: projCompletionPercent,
         overall_progress: prog?.overall_progress ?? 0,
         skills,
-        monthly_assessment: monthlyAssessment,
         level: student?.current_level ?? null,
         teacher_evaluation: evaluation.trim() || null,
         recommendations: recommendations.trim() || null,
@@ -310,9 +297,7 @@ function ReportsPage() {
                     {studentId ? (
                       <span className="flex min-w-0 items-center gap-2 truncate">
                         <UserRound className="size-4 shrink-0 text-muted-foreground" />
-                        <span className="truncate">
-                          {nameOf.get(studentId) ?? "—"}
-                        </span>
+                        <span className="truncate">{nameOf.get(studentId) ?? "—"}</span>
                       </span>
                     ) : (
                       <span className="flex items-center gap-2 text-muted-foreground">

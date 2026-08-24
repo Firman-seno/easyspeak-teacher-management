@@ -1,22 +1,11 @@
-import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { ArrowLeft, Clock, Download, Printer, Save } from "lucide-react";
+import { ArrowLeft, Clock, Download, Printer } from "lucide-react";
 import { useEffect, useMemo } from "react";
-import { toast } from "sonner";
 import { z } from "zod";
 
 import { EmptyState } from "@/components/kit";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Label } from "@/components/ui/label";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import {
   useAssignments,
   useLessons,
@@ -25,23 +14,16 @@ import {
   useSettings,
   useStudents,
 } from "@/hooks/use-data";
-import { api, qk } from "@/lib/api";
 import {
-  ASSESSMENT_SKILLS,
-  assessmentScoreKey,
-  buildMonthlyAssessment,
-  calculateSkillAssessment,
   effectiveAssignmentStatus,
   effectiveProjectStatus,
   formatDate,
   formatDuration,
-  formatScore,
   inDateRange,
   reportPeriodLong,
   reportPeriodShort,
   reportRange,
 } from "@/lib/domain";
-import type { AssessmentSkill, Lesson, MonthlyReport } from "@/lib/domain";
 import { buildReportPdf } from "@/lib/pdf";
 
 const reportSearch = z.object({
@@ -55,8 +37,7 @@ export const Route = createFileRoute("/_authenticated/reports/$id")({
       { title: "Monthly report — EasySpeak Teacher Management" },
       {
         name: "description",
-        content:
-          "Printable monthly student progress report with attendance, lessons, projects and monthly assessment.",
+        content: "Printable monthly student progress report with attendance, lessons and projects.",
       },
       { property: "og:title", content: "Monthly report — EasySpeak Teacher Management" },
       { property: "og:description", content: "Professional printable progress report." },
@@ -64,176 +45,6 @@ export const Route = createFileRoute("/_authenticated/reports/$id")({
   }),
   component: ReportDetail,
 });
-
-const ASSESSMENT_LABELS: Record<AssessmentSkill, string> = {
-  speaking: "Speaking",
-  listening: "Listening",
-  reading: "Reading",
-  writing: "Writing",
-  vocabulary: "Vocabulary",
-};
-
-function skillScoreRows(lessons: Lesson[], skill: AssessmentSkill) {
-  return lessons
-    .map((l) => ({ id: l.id, date: l.date, title: l.title, score: l[assessmentScoreKey(skill)] }))
-    .filter((r) => r.score != null)
-    .sort((a, b) => a.date.localeCompare(b.date));
-}
-
-function CalculatedField({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="space-y-1">
-      {label ? (
-        <Label className="text-[11px] font-medium text-muted-foreground">{label}</Label>
-      ) : null}
-      <div className="flex h-8 items-center rounded-md border border-border/70 bg-muted/40 px-3 text-sm font-semibold text-foreground print:border-none print:bg-transparent print:px-0">
-        {value}
-      </div>
-    </div>
-  );
-}
-
-function AssessmentEditor({ report, lessons }: { report: MonthlyReport; lessons: Lesson[] }) {
-  const qc = useQueryClient();
-
-  const calcFor = (skill: AssessmentSkill) =>
-    calculateSkillAssessment(lessons.map((l) => l[assessmentScoreKey(skill)]));
-
-  const save = useMutation({
-    mutationFn: () =>
-      api.updateReport(report.id, { monthly_assessment: buildMonthlyAssessment(lessons) }),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: qk.reports });
-      toast.success("Monthly assessment saved.");
-    },
-    onError: (e: Error) => toast.error(e.message || "Something went wrong."),
-  });
-
-  return (
-    <section>
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <h3 className="border-b-2 border-accent pb-1 text-xs font-semibold tracking-widest text-foreground uppercase">
-          Monthly Assessment
-        </h3>
-        <Button
-          size="sm"
-          onClick={() => save.mutate()}
-          disabled={save.isPending}
-          className="print:hidden"
-        >
-          <Save className="size-4" /> {save.isPending ? "Saving…" : "Save assessment"}
-        </Button>
-      </div>
-
-      <div className="mt-4 grid gap-4 lg:grid-cols-2">
-        {ASSESSMENT_SKILLS.map((skill) => {
-          const rows = skillScoreRows(lessons, skill);
-          const calc = calcFor(skill);
-          return (
-            <div key={skill} className="rounded-xl border border-border bg-muted/20 p-4">
-              <div className="flex items-center justify-between gap-2">
-                <p className="text-sm font-semibold tracking-wide text-foreground uppercase">
-                  {ASSESSMENT_LABELS[skill]}
-                </p>
-                <span className="rounded-full bg-accent/15 px-2.5 py-0.5 text-xs font-medium text-accent-foreground">
-                  {rows.length} assessed
-                </span>
-              </div>
-
-              {rows.length === 0 ? (
-                <p className="mt-3 text-sm text-muted-foreground">Not Assessed</p>
-              ) : (
-                <div className="mt-3 overflow-x-auto rounded-lg border border-border bg-card">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead className="h-8">Date</TableHead>
-                        <TableHead className="h-8">Lesson</TableHead>
-                        <TableHead className="h-8 text-right">Score</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {rows.map((r) => (
-                        <TableRow key={r.id}>
-                          <TableCell className="text-xs whitespace-nowrap">
-                            {formatDate(r.date)}
-                          </TableCell>
-                          <TableCell className="text-xs">{r.title}</TableCell>
-                          <TableCell className="text-xs font-medium text-right">
-                            {r.score}
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
-              )}
-
-              <div className="mt-3 grid grid-cols-2 gap-2 sm:gap-3">
-                <CalculatedField
-                  label="Monthly Total"
-                  value={calc ? formatScore(calc.total) : "0"}
-                />
-                <CalculatedField
-                  label="Final Score"
-                  value={calc ? formatScore(calc.final_score) : "Not Assessed"}
-                />
-              </div>
-              <div className="mt-3">
-                <CalculatedField
-                  label="Percentage"
-                  value={calc ? `${formatScore(calc.percentage)}%` : "Not Assessed"}
-                />
-              </div>
-            </div>
-          );
-        })}
-      </div>
-
-      <div className="mt-6 overflow-hidden rounded-xl border border-border">
-        <div className="border-b border-border bg-muted/30 px-4 py-3">
-          <h4 className="text-xs font-semibold tracking-widest text-foreground uppercase">
-            Monthly Assessment Summary
-          </h4>
-        </div>
-        <div className="overflow-x-auto">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Skill</TableHead>
-                <TableHead>Lessons Assessed</TableHead>
-                <TableHead>Total Score</TableHead>
-                <TableHead>Final Score</TableHead>
-                <TableHead>Percentage</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {ASSESSMENT_SKILLS.map((skill) => {
-                const rows = skillScoreRows(lessons, skill);
-                const calc = calcFor(skill);
-                return (
-                  <TableRow key={skill}>
-                    <TableCell className="font-medium">{ASSESSMENT_LABELS[skill]}</TableCell>
-                    <TableCell className="whitespace-nowrap">{rows.length || "—"}</TableCell>
-                    <TableCell className="whitespace-nowrap">
-                      {calc ? formatScore(calc.total) : "0"}
-                    </TableCell>
-                    <TableCell className="whitespace-nowrap">
-                      {calc ? formatScore(calc.final_score) : "Not Assessed"}
-                    </TableCell>
-                    <TableCell className="whitespace-nowrap">
-                      {calc ? `${formatScore(calc.percentage)}%` : "Not Assessed"}
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
-        </div>
-      </div>
-    </section>
-  );
-}
 
 function ReportDetail() {
   const { id } = Route.useParams();
@@ -524,8 +335,6 @@ function ReportDetail() {
                 ))}
               </div>
             </section>
-
-            <AssessmentEditor key={report.id} report={report} lessons={periodLessons} />
 
             {periodLessons.length > 0 && (
               <section>
