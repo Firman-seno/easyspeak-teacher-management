@@ -56,6 +56,10 @@ export function isUniqueViolation(error: unknown): boolean {
   );
 }
 
+function normalizeStudentCode(value: string): string {
+  return value.trim();
+}
+
 export function friendlyDbError(error: unknown, studentCode?: string): Error {
   const text = errorText(error);
   if (
@@ -109,14 +113,37 @@ export const api = {
   },
 
   // Returns the existing student that already owns this Student ID code, or
-  // null when the code is free. `excludeStudentId` makes the check ignore a
-  // specific row (used while editing so keeping your own ID is allowed).
+  // null when the code is free. Matching ignores letter case and surrounding
+  // spaces, so "Stu-012", "STU-012" and " stu-012 " are the same ID.
+  // `excludeStudentId` makes the check ignore a specific row (used while
+  // editing so keeping your own ID is allowed).
   async studentByCode(code: string, excludeStudentId?: string): Promise<Student | null> {
-    let q = supabase.from("students").select("*").eq("student_id", code.trim());
+    const normalized = normalizeStudentCode(code).toLowerCase();
+    if (!normalized) return null;
+
+    // ilike treats % _ \ as wildcards, so escape them for an exact match.
+    const pattern = normalized.replace(/[\\%_]/g, (m) => `\\${m}`);
+
+    let q = supabase.from("students").select("*").ilike("student_id", pattern);
     if (excludeStudentId) q = q.neq("id", excludeStudentId);
-    const { data, error } = await q.limit(1).maybeSingle();
+    const { data, error } = await q.limit(5);
     if (error) throw friendlyDbError(error);
-    return (data as Student | null) ?? null;
+    // Precise comparison handles legacy rows stored with stray spaces.
+    const exact = (data as Student[] | null)?.find(
+      (s) => s.student_id.trim().toLowerCase() === normalized,
+    );
+    if (exact) return exact;
+
+    // Safety net for legacy rows like " Stu-012 ": broad search + precise trim.
+    let broad = supabase.from("students").select("*").ilike("student_id", `%${pattern}%`);
+    if (excludeStudentId) broad = broad.neq("id", excludeStudentId);
+    const wide = await broad.limit(10);
+    if (wide.error) throw friendlyDbError(wide.error);
+    return (
+      (wide.data as Student[] | null)?.find(
+        (s) => s.student_id.trim().toLowerCase() === normalized,
+      ) ?? null
+    );
   },
 
   // Suggests the next free Student ID. Continues the numeric sequence when
@@ -127,7 +154,6 @@ export const api = {
     if (error) throw friendlyDbError(error);
     const ids = (data ?? []).map((r) => r.student_id.trim());
     const taken = new Set(ids.map((i) => i.toLowerCase()));
-
     const numericIds = ids.filter((i) => /^\d+$/.test(i));
     if (numericIds.length > 0) {
       const width = Math.max(3, ...numericIds.map((i) => i.length));
@@ -156,21 +182,24 @@ export const api = {
   async createStudent(
     values: TablesInsert<"students">,
   ): Promise<{ student: Student; enrolled: boolean }> {
-    const studentCode = values.student_id?.trim();
+    const studentCode = values.student_id ? normalizeStudentCode(values.student_id) : undefined;
     if (!values.name?.trim()) throw new Error("Full name is required.");
     if (!studentCode) throw new Error("Student ID is required.");
 
     // Layer 1: explicit pre-check so we never attempt a doomed INSERT.
     const existing = await api.studentByCode(studentCode);
     if (existing) {
-      throw new Error(
-        `Student ID ${studentCode} is already registered. Please enter a different Student ID.`,
-      );
+      throw new Error("Student ID already exists. Please use a different Student ID.");
     }
 
     // Layer 2: the UNIQUE constraint still guards against race conditions;
-    // its raw error is translated to a friendly message.
-    const { data, error } = await supabase.from("students").insert(values).select().single();
+    // its raw error is translated to a friendly message. The stored code is
+    // normalized (trimmed) before writing.
+    const { data, error } = await supabase
+      .from("students")
+      .insert({ ...values, student_id: studentCode })
+      .select()
+      .single();
     if (error) throw friendlyDbError(error, studentCode);
 
     const student = data as Student;
@@ -190,7 +219,8 @@ export const api = {
   },
 
   async updateStudent(id: string, values: TablesUpdate<"students">): Promise<Student> {
-    const nextCode = typeof values.student_id === "string" ? values.student_id.trim() : undefined;
+    const nextCode =
+      typeof values.student_id === "string" ? normalizeStudentCode(values.student_id) : undefined;
     if (nextCode === "") throw new Error("Student ID is required.");
 
     // Editing a student may keep their own ID; only block codes owned by
@@ -198,15 +228,13 @@ export const api = {
     if (nextCode) {
       const existing = await api.studentByCode(nextCode, id);
       if (existing) {
-        throw new Error(
-          `Student ID ${nextCode} is already used by another student. Please enter a different Student ID.`,
-        );
+        throw new Error(`Student ID ${nextCode} is already used by another student.`);
       }
     }
 
     const { data, error } = await supabase
       .from("students")
-      .update(values)
+      .update(nextCode ? { ...values, student_id: nextCode } : values)
       .eq("id", id)
       .select()
       .single();

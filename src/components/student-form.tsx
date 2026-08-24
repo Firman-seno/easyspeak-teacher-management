@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
-import { AlertTriangle, CheckCircle2, Loader2, Search, Wand2 } from "lucide-react";
+import { AlertTriangle, Loader2, Search, Wand2 } from "lucide-react";
 import { toast } from "sonner";
 import { z } from "zod";
 
@@ -28,16 +28,8 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { StatusBadge, statusTone } from "@/components/kit";
 import { api, qk } from "@/lib/api";
-import {
-  LEVELS,
-  PROGRAMS,
-  STUDENT_STATUSES,
-  initials,
-  levelRank,
-  levelsForProgram,
-  todayISO,
-} from "@/lib/domain";
-import type { Student, Teacher } from "@/lib/domain";
+import { LEVELS, STUDENT_STATUSES, initials, todayISO } from "@/lib/domain";
+import type { Student } from "@/lib/domain";
 import type { TablesInsert } from "@/integrations/supabase/types";
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
@@ -48,6 +40,14 @@ function validDateString(value: string) {
   if (!value) return true;
   if (!DATE_RE.test(value)) return false;
   return !Number.isNaN(new Date(`${value}T00:00:00`).getTime());
+}
+
+// Rank on the global CEFR ladder. Levels outside the ladder (legacy data
+// such as "IELTS Intermediate") rank above everything so they never force
+// a target-level downgrade.
+function cefrRank(level: string): number {
+  const i = LEVELS.indexOf(level as (typeof LEVELS)[number]);
+  return i === -1 ? Number.MAX_SAFE_INTEGER - 1 : i;
 }
 
 // Shared shape so both "create student" and "enroll existing" reuse it.
@@ -63,14 +63,14 @@ const formShape = {
     .refine((v) => !v || PHONE_RE.test(v), "Invalid phone number"),
   email: z.union([z.string().trim().email("Invalid email address").max(255), z.literal("")]),
   address: z.string().trim().max(300).optional(),
-  program: z.string().min(1, "Program is required"),
+  program: z.string().trim().min(1, "Program is required").max(120),
   current_level: z.string().min(1, "Current level is required"),
   target_level: z.string().min(1),
   enrollment_date: z
     .string()
     .min(1, "Enrollment date is required")
     .refine(validDateString, "Invalid date"),
-  teacher_id: z.string().optional(),
+  teacher: z.string().trim().max(120).optional(),
   status: z.string().min(1),
   photo: z.string().trim().max(500).optional(),
   notes: z.string().trim().max(1000).optional(),
@@ -84,8 +84,8 @@ const formShape = {
   parent_email: z.union([z.string().trim().email("Invalid email address").max(255), z.literal("")]),
 };
 
-function targetLevelIssue(ctx: z.RefinementCtx, program: string, current: string, target: string) {
-  if (program && current && target && levelRank(program, target) < levelRank(program, current)) {
+function targetLevelIssue(ctx: z.RefinementCtx, _program: string, current: string, target: string) {
+  if (current && target && cefrRank(target) < cefrRank(current)) {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
       path: ["target_level"],
@@ -108,9 +108,7 @@ const enrollSchema = z
   })
   .superRefine((v, ctx) => targetLevelIssue(ctx, v.program, v.current_level, v.target_level));
 
-type FormValues = z.infer<typeof studentSchema> & {
-  teacher_id: string;
-};
+type FormValues = z.infer<typeof studentSchema>;
 
 type EditableValues = FormValues;
 
@@ -128,7 +126,7 @@ const empty: EditableValues = {
   current_level: "A1",
   target_level: "B1",
   enrollment_date: todayISO(),
-  teacher_id: "",
+  teacher: "",
   status: "Active",
   photo: "",
   notes: "",
@@ -157,6 +155,7 @@ export function StudentFormDialog({
   const [idStatus, setIdStatus] = useState<IdStatus>("idle");
   const [existingStudent, setExistingStudent] = useState<Student | null>(null);
   const [generating, setGenerating] = useState(false);
+  const [idTouched, setIdTouched] = useState(false);
 
   // Directory + relations used by both tabs.
   const [students, setStudents] = useState<Student[]>([]);
@@ -166,7 +165,6 @@ export function StudentFormDialog({
     queryFn: api.enrollments,
     enabled: open,
   });
-  const teachers: Teacher[] = useMemo(() => teachersQuery.data ?? [], [teachersQuery.data]);
 
   // --- "Enroll Existing Student" tab state ---
   const [searchQuery, setSearchQuery] = useState("");
@@ -177,6 +175,7 @@ export function StudentFormDialog({
     if (!open) return;
     setErrors({});
     setIdStatus("idle");
+    setIdTouched(false);
     setExistingStudent(null);
     setMode("create");
     setSearchQuery("");
@@ -195,7 +194,7 @@ export function StudentFormDialog({
             current_level: student.current_level,
             target_level: student.target_level,
             enrollment_date: student.enrollment_date,
-            teacher_id: student.teacher_id ?? "",
+            teacher: student.teacher ?? "",
             status: student.status,
             photo: student.photo ?? "",
             notes: student.notes ?? "",
@@ -221,22 +220,21 @@ export function StudentFormDialog({
     };
   }, [open]);
 
-  // Resolve the logged-in teacher so new students get teacher_id pre-filled.
+  // Pre-fill Teacher with the logged-in user's saved name when available.
   useEffect(() => {
     if (!open || student) return;
     let cancelled = false;
     api
-      .getOrCreateCurrentTeacher()
+      .currentTeacher()
       .then((t) => {
         if (!t || cancelled) return;
-        void qc.invalidateQueries({ queryKey: qk.teachers });
-        setValues((v) => ({ ...v, teacher_id: v.teacher_id || t.id }));
+        setValues((v) => ({ ...v, teacher: v.teacher || t.name }));
       })
       .catch(() => {});
     return () => {
       cancelled = true;
     };
-  }, [open, student, qc]);
+  }, [open, student]);
 
   // Debounced real-time Student ID availability check (ignores own row).
   const studentCode = values.student_id.trim();
@@ -275,58 +273,32 @@ export function StudentFormDialog({
     setValues((v) => ({ ...v, [key]: value }));
 
   const levelOptions = useMemo(() => {
-    const list = [...levelsForProgram(values.program)];
+    const list: string[] = [...LEVELS];
+    // Legacy levels outside the CEFR ladder stay selectable for old records.
     for (const lv of [values.current_level, values.target_level]) {
       if (lv && !list.includes(lv)) list.push(lv);
     }
     return list;
-  }, [values.program, values.current_level, values.target_level]);
+  }, [values.current_level, values.target_level]);
 
   const targetError = useMemo(() => {
-    if (!values.program || !values.current_level || !values.target_level) return null;
-    if (
-      levelRank(values.program, values.target_level) <
-      levelRank(values.program, values.current_level)
-    ) {
+    if (!values.current_level || !values.target_level) return null;
+    if (cefrRank(values.target_level) < cefrRank(values.current_level)) {
       return "Target level cannot be lower than the current level.";
     }
     return null;
-  }, [values.program, values.current_level, values.target_level]);
-
-  const changeProgram = (program: string) =>
-    setValues((v) => {
-      const ladder = [...levelsForProgram(program)];
-      const current_level = ladder.includes(v.current_level) ? v.current_level : ladder[0]!;
-      const curRank = levelRank(program, current_level);
-      const target_level =
-        ladder.includes(v.target_level) && levelRank(program, v.target_level) >= curRank
-          ? v.target_level
-          : ladder[Math.min(ladder.length - 1, curRank + 1)]!;
-      return { ...v, program, current_level, target_level };
-    });
+  }, [values.current_level, values.target_level]);
 
   const changeCurrentLevel = (level: string) =>
     setValues((v) => {
-      const target_level =
-        levelRank(v.program, v.target_level) >= levelRank(v.program, level)
-          ? v.target_level
-          : level;
+      const target_level = cefrRank(v.target_level) >= cefrRank(level) ? v.target_level : level;
       return { ...v, current_level: level, target_level };
     });
 
   const applyEnrollDefaults = (s: Student) => {
-    const ladder = [...levelsForProgram(s.program)];
-    const current = ladder.includes(s.current_level) ? s.current_level : ladder[0]!;
-    const rank = ladder.indexOf(current);
-    const target =
-      ladder.includes(s.target_level) && ladder.indexOf(s.target_level) >= rank
-        ? s.target_level
-        : ladder[Math.min(ladder.length - 1, rank + 1)]!;
     setValues((v) => ({
       ...v,
       program: s.program,
-      current_level: current,
-      target_level: target,
       enrollment_date: todayISO(),
     }));
   };
@@ -335,6 +307,7 @@ export function StudentFormDialog({
     setGenerating(true);
     try {
       const id = await api.nextStudentId();
+      setIdTouched(true);
       set("student_id", id);
     } catch (e) {
       toast.error((e as Error).message || "Could not generate a Student ID.");
@@ -352,11 +325,12 @@ export function StudentFormDialog({
     void qc.invalidateQueries({ queryKey: qk.progress });
     void qc.invalidateQueries({ queryKey: qk.reports });
     void qc.invalidateQueries({ queryKey: qk.attendance });
-    void qc.invalidateQueries({ queryKey: qk.teachers });
   };
 
   const saveMutation = useMutation({
     mutationFn: async (): Promise<{ enrolled: boolean }> => {
+      // The stored code keeps the user's casing, but is always trimmed.
+      // Case-insensitive + trimmed uniqueness is enforced by the DB index.
       const payload: TablesInsert<"students"> = {
         name: values.name.trim(),
         student_id: values.student_id.trim(),
@@ -365,7 +339,7 @@ export function StudentFormDialog({
         phone: values.phone || null,
         email: values.email || null,
         address: values.address || null,
-        program: values.program,
+        program: values.program.trim(),
         current_level: values.current_level,
         target_level: values.target_level,
         enrollment_date: values.enrollment_date,
@@ -376,9 +350,8 @@ export function StudentFormDialog({
         parent_relationship: values.parent_relationship || null,
         parent_phone: values.parent_phone || null,
         parent_email: values.parent_email || null,
-        teacher_id: values.teacher_id || null,
+        teacher: (values.teacher ?? "").trim() || null,
       };
-      if (!values.teacher_id) payload.teacher = null; // clear legacy text too
 
       if (isEdit && student) {
         await api.updateStudent(student.id, payload);
@@ -407,7 +380,7 @@ export function StudentFormDialog({
       await api.enrollExistingStudent({
         studentId: enrollTarget.id,
         programName: values.program,
-        teacherId: values.teacher_id || null,
+        teacherId: resolvedTeacherId,
         enrollmentDate: values.enrollment_date,
         currentLevel: values.current_level,
         targetLevel: values.target_level,
@@ -435,9 +408,10 @@ export function StudentFormDialog({
   }
 
   const showForm = isEdit || mode === "create";
-  const idOk = !showForm ? true : idStatus === "available";
+  const idOk = !showForm ? true : !!studentCode && idStatus === "available";
 
   const submitCreate = () => {
+    setIdTouched(true);
     if (!parsed.success) {
       setErrors(fieldErrors);
       toast.error("Please fix the highlighted fields.");
@@ -459,19 +433,30 @@ export function StudentFormDialog({
     saveMutation.mutate();
   };
 
+  // Best-effort match of the typed teacher name to a known teachers row so
+  // the duplicate-enrollment guard keeps working with free-text input.
+  const resolvedTeacherId = useMemo(() => {
+    const wanted = (values.teacher ?? "").trim().toLowerCase();
+    if (!wanted) return null;
+    return (
+      (teachersQuery.data ?? []).find((t) => t.name.trim().toLowerCase() === wanted)?.id ?? null
+    );
+  }, [values.teacher, teachersQuery.data]);
+
   // Duplicate-enrollment guard for the Enroll tab (same student + program +
   // teacher as an active enrollment). The server re-checks on save.
   const alreadyEnrolled = useMemo(() => {
-    if (!enrollTarget || !values.program) return false;
-    const wanted = values.program.toLowerCase();
+    if (!enrollTarget) return false;
+    const wanted = values.program.trim().toLowerCase();
+    if (!wanted) return false;
     return (enrollmentsQuery.data ?? []).some(
       (e) =>
         e.student_id === enrollTarget.id &&
         e.status === "Active" &&
-        e.programs?.name?.toLowerCase() === wanted &&
-        (e.teacher_id ?? null) === (values.teacher_id || null),
+        e.programs?.name?.trim().toLowerCase() === wanted &&
+        (e.teacher_id ?? null) === resolvedTeacherId,
     );
-  }, [enrollTarget, values.program, values.teacher_id, enrollmentsQuery.data]);
+  }, [enrollTarget, values.program, resolvedTeacherId, enrollmentsQuery.data]);
 
   const enrollCheck = enrollSchema.safeParse(values);
   const enrollReady =
@@ -551,39 +536,29 @@ export function StudentFormDialog({
     </div>
   );
 
-  const teacherOptions: Teacher[] = useMemo(() => {
-    const list = [...teachers];
-    if (values.teacher_id && !list.some((t) => t.id === values.teacher_id)) {
-      list.push({
-        id: values.teacher_id,
-        name: "Me (current teacher)",
-        email: null,
-        user_id: null,
-        created_at: "",
-      });
-    }
-    return list.sort((a, b) => a.name.localeCompare(b.name));
-  }, [teachers, values.teacher_id]);
-
   const teacherField = (
     <div className="space-y-1.5">
-      <Label>Teacher</Label>
-      <Select
-        value={values.teacher_id || "none"}
-        onValueChange={(v) => set("teacher_id", v === "none" ? "" : v)}
-      >
-        <SelectTrigger>
-          <SelectValue placeholder="Select teacher" />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="none">Not assigned</SelectItem>
-          {teacherOptions.map((t) => (
-            <SelectItem key={t.id} value={t.id}>
-              {t.name}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
+      <Label htmlFor="teacher">Teacher</Label>
+      <Input
+        id="teacher"
+        value={values.teacher}
+        onChange={(e) => set("teacher", e.target.value)}
+        placeholder="Enter teacher name"
+      />
+    </div>
+  );
+
+  const programField = (
+    <div className="space-y-1.5">
+      <Label htmlFor="program">Program *</Label>
+      <Input
+        id="program"
+        value={values.program}
+        onChange={(e) => set("program", e.target.value)}
+        placeholder="Enter program name"
+        aria-invalid={!!errors["program"]}
+      />
+      {errors["program"] && <p className="text-xs text-destructive">{errors["program"]}</p>}
     </div>
   );
 
@@ -612,68 +587,73 @@ export function StudentFormDialog({
       <Input
         id="student_code"
         value={values.student_id}
-        onChange={(e) => set("student_id", e.target.value)}
+        onChange={(e) => {
+          setIdTouched(true);
+          set("student_id", e.target.value);
+        }}
+        onBlur={() => setIdTouched(true)}
         placeholder="e.g. 011 or STU-0011"
-        aria-invalid={idStatus === "taken" || idStatus === "invalid"}
+        aria-invalid={idStatus === "taken" || idStatus === "invalid" || (idTouched && !studentCode)}
       />
+      {!studentCode && idTouched && (
+        <p className="text-xs text-destructive">Student ID is required.</p>
+      )}
       {idStatus === "checking" && (
         <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
-          <Loader2 className="size-3 animate-spin" /> Checking availability…
+          <Loader2 className="size-3 animate-spin" /> Checking Student ID...
         </p>
       )}
       {idStatus === "available" && (
-        <p className="flex items-center gap-1.5 text-xs text-success">
-          <CheckCircle2 className="size-3.5" /> Student ID is available.
-        </p>
+        <p className="text-xs text-success">✓ Student ID is available.</p>
       )}
       {idStatus === "invalid" && (
         <p className="flex items-start gap-1.5 text-xs text-destructive">
-          <AlertTriangle className="mt-0.5 size-3.5 shrink-0" /> Invalid Student ID. Use letters,
-          numbers, dots or dashes.
+          <AlertTriangle className="mt-0.5 size-3.5 shrink-0" /> Invalid Student ID format.
         </p>
       )}
       {idStatus === "taken" && (
         <div className="rounded-lg border border-destructive/30 bg-destructive/10 p-2.5 text-xs">
-          <p className="flex items-start gap-1.5 font-medium text-destructive">
-            <AlertTriangle className="mt-0.5 size-3.5 shrink-0" />
-            <span>
-              {isEdit
-                ? `Student ID ${studentCode} is already used by another student. Please enter a different Student ID.`
-                : `⚠ Student ID ${studentCode} is already registered.`}
-              <br />
-              Please enter a different Student ID.
-            </span>
+          <p className="font-medium text-destructive">
+            ❌{" "}
+            {isEdit
+              ? `Student ID ${studentCode} is already used by another student.`
+              : "Student ID already exists."}
           </p>
-          {!isEdit && existingStudent && (
-            <div className="mt-2 flex flex-wrap items-center gap-2 pl-5">
-              <span className="text-muted-foreground">
-                Existing: <strong>{existingStudent.name}</strong>
-              </span>
-              <Button
-                asChild
-                size="sm"
-                variant="outline"
-                className="h-7"
-                onClick={() => onOpenChange(false)}
-              >
-                <Link to="/students/$id" params={{ id: existingStudent.id }}>
-                  View Existing Student
-                </Link>
-              </Button>
-              <Button
-                size="sm"
-                variant="secondary"
-                className="h-7"
-                onClick={() => {
-                  setMode("enroll");
-                  setEnrollTarget(existingStudent);
-                  setSearchQuery(`${existingStudent.name} (${existingStudent.student_id})`);
-                  applyEnrollDefaults(existingStudent);
-                }}
-              >
-                Enroll Existing Student
-              </Button>
-            </div>
+          {!isEdit && (
+            <>
+              <p className="mt-0.5 text-muted-foreground">Please enter a different Student ID.</p>
+              {existingStudent && (
+                <div className="mt-2 flex flex-wrap items-center gap-2">
+                  <span className="text-muted-foreground">
+                    Existing: <strong>{existingStudent.name}</strong>
+                  </span>
+                  <Button
+                    asChild
+                    size="sm"
+                    variant="outline"
+                    className="h-7"
+                    onClick={() => onOpenChange(false)}
+                  >
+                    <Link to="/students/$id" params={{ id: existingStudent.id }}>
+                      View Existing Student
+                    </Link>
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    className="h-7"
+                    onClick={() => {
+                      setMode("enroll");
+                      setEnrollTarget(existingStudent);
+                      setSearchQuery(`${existingStudent.name} (${existingStudent.student_id})`);
+                      applyEnrollDefaults(existingStudent);
+                    }}
+                  >
+                    Enroll Existing Student
+                  </Button>
+                </div>
+              )}
+            </>
           )}
         </div>
       )}
@@ -682,13 +662,8 @@ export function StudentFormDialog({
 
   const academicFields = (
     <>
-      {selectField("program", "Program *", PROGRAMS, changeProgram)}
-      {selectField(
-        "current_level",
-        "Current Level *",
-        levelOptions.length ? levelOptions : LEVELS,
-        changeCurrentLevel,
-      )}
+      {programField}
+      {selectField("current_level", "Current Level *", levelOptions, changeCurrentLevel)}
       <div className="space-y-1.5">
         <Label>Target Level</Label>
         <Select
@@ -699,7 +674,7 @@ export function StudentFormDialog({
             <SelectValue placeholder="Select target level" />
           </SelectTrigger>
           <SelectContent>
-            {(levelOptions.length ? levelOptions : LEVELS).map((o) => (
+            {levelOptions.map((o) => (
               <SelectItem key={o} value={o}>
                 {o}
               </SelectItem>
