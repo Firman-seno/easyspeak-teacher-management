@@ -1,19 +1,22 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { Eye, Pencil, Plus, Search, Trash2 } from "lucide-react";
+import { Archive, Eye, Pencil, Plus, Search, Trash2 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 
-import {
-  ConfirmDialog,
-  EmptyState,
-  PageHeader,
-  ProgressBar,
-  StatusBadge,
-  statusTone,
-} from "@/components/kit";
+import { EmptyState, PageHeader, ProgressBar, StatusBadge, statusTone } from "@/components/kit";
 import { StudentFormDialog } from "@/components/student-form";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -85,14 +88,29 @@ function StudentsPage() {
   const [editing, setEditing] = useState<Student | null>(null);
   const [toDelete, setToDelete] = useState<Student | null>(null);
 
+  // Deleting cascades into historical data, so Archive is offered first.
   const remove = useMutation({
     mutationFn: (id: string) => api.deleteStudent(id),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: qk.students });
-      toast.success("Data successfully deleted.");
+      qc.invalidateQueries({ queryKey: qk.enrollments });
+      toast.success("Student permanently deleted.");
       setToDelete(null);
     },
-    onError: () => toast.error("Something went wrong."),
+    onError: () =>
+      toast.error(
+        "This student could not be deleted. Try archiving them instead to keep their history.",
+      ),
+  });
+
+  const archive = useMutation({
+    mutationFn: (id: string) => api.archiveStudent(id),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: qk.students });
+      toast.success("Student archived. Historical learning data is kept.");
+      setToDelete(null);
+    },
+    onError: (e: Error) => toast.error(e.message || "Something went wrong."),
   });
 
   const rows = useMemo(() => {
@@ -106,6 +124,8 @@ function StudentsPage() {
     const q = search.trim().toLowerCase();
     const filtered = list.filter(({ student, att, progress: pr }) => {
       if (q && !`${student.name} ${student.student_id}`.toLowerCase().includes(q)) return false;
+      // Archived students are hidden unless explicitly filtered for.
+      if (status === "all" && student.status === "Archived") return false;
       if (program !== "all" && student.program !== program) return false;
       if (level !== "all" && student.current_level !== level) return false;
       if (status !== "all" && student.status !== status) return false;
@@ -370,13 +390,46 @@ function StudentsPage() {
       )}
 
       <StudentFormDialog open={formOpen} onOpenChange={setFormOpen} student={editing} />
-      <ConfirmDialog
+      <AlertDialog
         open={!!toDelete}
-        onOpenChange={(o) => !o && setToDelete(null)}
-        title="Are you sure you want to delete this student?"
-        description={`${toDelete?.name} and all related attendance, projects and progress records will be permanently removed.`}
-        onConfirm={() => toDelete && remove.mutate(toDelete.id)}
-      />
+        onOpenChange={(o) => {
+          if (!o) setToDelete(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete this student?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete {toDelete?.name}? Their attendance, learning sessions,
+              assignments, projects, grades and reports will be permanently removed. To keep the
+              historical learning data safe, archive the student instead — archived students are
+              hidden from the active list but all their records stay intact.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="flex-col gap-2 sm:flex-row">
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={archive.isPending}
+              onClick={(e) => {
+                e.preventDefault();
+                if (toDelete) archive.mutate(toDelete.id);
+              }}
+            >
+              <Archive className="size-4" /> Archive Student
+            </AlertDialogAction>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={remove.isPending}
+              onClick={(e) => {
+                e.preventDefault();
+                if (toDelete) remove.mutate(toDelete.id);
+              }}
+            >
+              <Trash2 className="size-4" /> Delete Permanently
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

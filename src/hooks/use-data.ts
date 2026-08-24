@@ -17,3 +17,7 @@ export const useProgressHistory = (studentId?: string) =>
     queryKey: qk.progressHistory(studentId),
     queryFn: () => api.progressHistory(studentId),
   });
+export const usePrograms = () => useQuery({ queryKey: qk.programs, queryFn: api.programs });
+export const useTeachers = () => useQuery({ queryKey: qk.teachers, queryFn: api.teachers });
+export const useEnrollments = () =>
+  useQuery({ queryKey: qk.enrollments, queryFn: api.enrollments });

@@ -137,6 +137,67 @@ export type Database = {
           },
         ]
       }
+      enrollments: {
+        Row: {
+          created_at: string
+          current_level: string
+          enrollment_date: string
+          id: string
+          program_id: string
+          status: string
+          student_id: string
+          target_level: string
+          teacher_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          current_level: string
+          enrollment_date?: string
+          id?: string
+          program_id: string
+          status?: string
+          student_id: string
+          target_level: string
+          teacher_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          current_level?: string
+          enrollment_date?: string
+          id?: string
+          program_id?: string
+          status?: string
+          student_id?: string
+          target_level?: string
+          teacher_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "enrollments_program_id_fkey"
+            columns: ["program_id"]
+            isOneToOne: false
+            referencedRelation: "programs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "enrollments_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "enrollments_teacher_id_fkey"
+            columns: ["teacher_id"]
+            isOneToOne: false
+            referencedRelation: "teachers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       lessons: {
         Row: {
           attachment: string | null
@@ -490,6 +551,27 @@ export type Database = {
           },
         ]
       }
+      programs: {
+        Row: {
+          allowed_levels: string[]
+          created_at: string
+          id: string
+          name: string
+        }
+        Insert: {
+          allowed_levels?: string[]
+          created_at?: string
+          id?: string
+          name: string
+        }
+        Update: {
+          allowed_levels?: string[]
+          created_at?: string
+          id?: string
+          name?: string
+        }
+        Relationships: []
+      }
       projects: {
         Row: {
           attachment: string | null
@@ -624,6 +706,10 @@ export type Database = {
           level_status: string
           name: string
           notes: string | null
+          parent_email: string | null
+          parent_name: string | null
+          parent_phone: string | null
+          parent_relationship: string | null
           phone: string | null
           photo: string | null
           program: string
@@ -631,6 +717,7 @@ export type Database = {
           student_id: string
           target_level: string
           teacher: string | null
+          teacher_id: string | null
           updated_at: string
         }
         Insert: {
@@ -646,6 +733,10 @@ export type Database = {
           level_status?: string
           name: string
           notes?: string | null
+          parent_email?: string | null
+          parent_name?: string | null
+          parent_phone?: string | null
+          parent_relationship?: string | null
           phone?: string | null
           photo?: string | null
           program?: string
@@ -653,6 +744,7 @@ export type Database = {
           student_id: string
           target_level?: string
           teacher?: string | null
+          teacher_id?: string | null
           updated_at?: string
         }
         Update: {
@@ -668,6 +760,10 @@ export type Database = {
           level_status?: string
           name?: string
           notes?: string | null
+          parent_email?: string | null
+          parent_name?: string | null
+          parent_phone?: string | null
+          parent_relationship?: string | null
           phone?: string | null
           photo?: string | null
           program?: string
@@ -675,9 +771,51 @@ export type Database = {
           student_id?: string
           target_level?: string
           teacher?: string | null
+          teacher_id?: string | null
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "students_teacher_id_fkey"
+            columns: ["teacher_id"]
+            isOneToOne: false
+            referencedRelation: "teachers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      teachers: {
+        Row: {
+          created_at: string
+          email: string | null
+          id: string
+          name: string
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          email?: string | null
+          id?: string
+          name: string
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          email?: string | null
+          id?: string
+          name?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "teachers_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedSchema: "auth"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {

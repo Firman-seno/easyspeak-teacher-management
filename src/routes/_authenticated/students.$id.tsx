@@ -235,6 +235,53 @@ function StudentDetail() {
               </div>
             </CardContent>
           </Card>
+
+          <Card className="shadow-soft md:col-span-2">
+            <CardHeader>
+              <CardTitle className="text-base">Enrollment & guardian</CardTitle>
+            </CardHeader>
+            <CardContent className="grid gap-x-8 gap-y-3 text-sm sm:grid-cols-2">
+              <div className="flex justify-between gap-4">
+                <span className="text-muted-foreground">Student ID</span>
+                <span className="font-medium">{student.student_id}</span>
+              </div>
+              <div className="flex justify-between gap-4">
+                <span className="text-muted-foreground">Teacher</span>
+                <span className="font-medium">{student.teacher ?? "Not assigned"}</span>
+              </div>
+              <div className="flex justify-between gap-4">
+                <span className="text-muted-foreground">Enrollment date</span>
+                <span className="font-medium">{formatDate(student.enrollment_date)}</span>
+              </div>
+              <div className="flex justify-between gap-4">
+                <span className="text-muted-foreground">Status</span>
+                <StatusBadge tone={statusTone(student.status)}>{student.status}</StatusBadge>
+              </div>
+              <div className="border-t pt-3 sm:col-span-2">
+                <p className="mb-2 text-xs font-medium tracking-wide text-muted-foreground uppercase">
+                  Parent / Guardian
+                </p>
+                <div className="grid gap-x-8 gap-y-2 sm:grid-cols-2">
+                  <div className="flex justify-between gap-4">
+                    <span className="text-muted-foreground">Name</span>
+                    <span className="font-medium">{student.parent_name ?? "—"}</span>
+                  </div>
+                  <div className="flex justify-between gap-4">
+                    <span className="text-muted-foreground">Relationship</span>
+                    <span className="font-medium">{student.parent_relationship ?? "—"}</span>
+                  </div>
+                  <div className="flex justify-between gap-4">
+                    <span className="text-muted-foreground">Phone</span>
+                    <span className="font-medium">{student.parent_phone ?? "—"}</span>
+                  </div>
+                  <div className="flex justify-between gap-4">
+                    <span className="text-muted-foreground">Email</span>
+                    <span className="truncate font-medium">{student.parent_email ?? "—"}</span>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
         </TabsContent>
 
         <TabsContent value="attendance" className="mt-4">

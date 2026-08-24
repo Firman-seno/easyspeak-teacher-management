@@ -71,6 +71,9 @@ export function statusTone(status: string): Tone {
     case "Assigned":
     case "Good":
       return "secondary";
+    case "Archived":
+    case "Inactive":
+      return "muted";
     default:
       return "muted";
   }

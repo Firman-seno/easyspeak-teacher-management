@@ -9,6 +9,9 @@ export type Progress = Tables<"progress">;
 export type ProgressHistory = Tables<"progress_history">;
 export type MonthlyReport = Tables<"monthly_reports">;
 export type LevelRow = Tables<"levels">;
+export type Program = Tables<"programs">;
+export type Teacher = Tables<"teachers">;
+export type Enrollment = Tables<"enrollments">;
 
 export const LEVELS = ["Pre-A1", "A1", "A2", "B1", "B2", "C1", "C2"] as const;
 export const PROGRAMS = [
@@ -18,7 +21,45 @@ export const PROGRAMS = [
   "IELTS Preparation",
   "Kids English",
 ] as const;
-export const STUDENT_STATUSES = ["Active", "Inactive", "Completed", "Suspended"] as const;
+export const STUDENT_STATUSES = [
+  "Active",
+  "Inactive",
+  "Completed",
+  "Suspended",
+  "Archived",
+] as const;
+
+// Levels allowed per program. Programs without an entry fall back to the
+// full CEFR ladder. IELTS has its own course-specific track.
+export const PROGRAM_LEVELS: Record<string, readonly string[]> = {
+  "General English": LEVELS,
+  "Conversation Class": ["A1", "A2", "B1", "B2", "C1", "C2"],
+  "Business English": ["A1", "A2", "B1", "B2", "C1", "C2"],
+  "Kids English": ["Pre-A1", "A1", "A2", "B1"],
+  "IELTS Preparation": ["Foundation", "IELTS Preparation", "IELTS Intermediate", "IELTS Advanced"],
+};
+
+export function levelsForProgram(program?: string | null): readonly string[] {
+  if (!program) return LEVELS;
+  return PROGRAM_LEVELS[program] ?? LEVELS;
+}
+
+function globalLevelRank(level: string): number {
+  const i = LEVELS.indexOf(level as (typeof LEVELS)[number]);
+  return i >= 0 ? i : 0;
+}
+
+// Rank of a level inside its program's ladder. Unknown levels fall back to
+// the global CEFR rank so mixed data still compares sensibly.
+export function levelRank(program: string | null | undefined, level: string): number {
+  const list = levelsForProgram(program);
+  const i = list.indexOf(level);
+  return i >= 0 ? i : globalLevelRank(level);
+}
+
+export function isValidLevelForProgram(program: string | null | undefined, level: string) {
+  return levelsForProgram(program).includes(level);
+}
 export const LESSON_STATUSES = ["Planned", "Complete"] as const;
 export const ATTENDANCE_STATUSES = ["Present", "Late", "Excused", "Absent"] as const;
 export const ASSIGNMENT_TYPES = [
