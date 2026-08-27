@@ -1,6 +1,6 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Copy, GraduationCap, Search } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { z } from "zod";
 
@@ -84,6 +84,8 @@ export function LessonFormDialog({
   const [values, setValues] = useState<FormValues>(empty);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [existingOpen, setExistingOpen] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const submitInProgress = useRef(false);
   const attendance = useAttendance();
 
   const presetStudent = useMemo(
@@ -169,6 +171,10 @@ export function LessonFormDialog({
       console.error("Failed to save lesson:", e);
       toast.error(`Failed to save the lesson. ${e.message}`);
     },
+    onSettled: () => {
+      submitInProgress.current = false;
+      setIsSubmitting(false);
+    },
   });
 
   const useExistingContent = (content: ExistingLessonContent) => {
@@ -189,7 +195,7 @@ export function LessonFormDialog({
   };
 
   const submit = () => {
-    if (mutation.isPending) return;
+    if (mutation.isPending || submitInProgress.current) return;
     const student = students.find((s) => s.id === values.studentId);
     if (student && (!student.program || !student.current_level)) {
       const message =
@@ -208,6 +214,8 @@ export function LessonFormDialog({
       toast.error("Please fix the highlighted fields.");
       return;
     }
+    submitInProgress.current = true;
+    setIsSubmitting(true);
     mutation.mutate(values);
   };
 
@@ -429,8 +437,12 @@ export function LessonFormDialog({
             <Button variant="outline" onClick={() => onOpenChange(false)}>
               Cancel
             </Button>
-            <Button onClick={submit} disabled={mutation.isPending}>
-              {mutation.isPending ? "Saving..." : lesson ? "Save changes" : "Add Material"}
+            <Button onClick={submit} disabled={mutation.isPending || isSubmitting}>
+              {mutation.isPending || isSubmitting
+                ? "Saving..."
+                : lesson
+                  ? "Save changes"
+                  : "Add Material"}
             </Button>
           </DialogFooter>
         </DialogContent>

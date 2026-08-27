@@ -438,7 +438,9 @@ export const api = {
   },
   async upsertAttendance(rows: TablesInsert<"attendance">[]) {
     if (!rows.length) return;
-    const { error } = await supabase.from("attendance").upsert(rows, { onConflict: "lesson_id" });
+    const { error } = await supabase
+      .from("attendance")
+      .upsert(rows, { onConflict: "student_id,date" });
     if (error) throw new Error(error.message);
   },
   async updateAttendance(id: string, values: TablesUpdate<"attendance">) {
@@ -475,7 +477,7 @@ export const api = {
         status: values.status ?? "Present",
         check_in_time: values.check_in_time ?? null,
       },
-      { onConflict: "lesson_id" },
+      { onConflict: "student_id,date" },
     );
     if (error) throw new Error(error.message);
   },
